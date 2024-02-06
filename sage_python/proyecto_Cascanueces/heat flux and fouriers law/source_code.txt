@@ -1,0 +1,125 @@
+sage: %phi = -kA(dt(t)/dx)
+...           #the negative sign says that the heat flux from a higher temperature REGIONS to a lower temperature REGIONS.
+...
+sage: #Extension de calculo multi-dimensional
+...           #(vector(q)) = -k(gradient(T)), recordar; heat flux density goes "down" the temperature gradient.
+...
+sage: #medicion de fluijo de calor (energy balance):
+...           #[(del(E_in)/del(t) - del(E_out)(del(t)) - del(E_accumulated)/(del(t))] = 0
+...                   
+...                   #donde, del(E)/del(T) representan la variacion TEMPORAL de respecto a la cantidad de energia entrante,
+...                   #la cantidad total de energia saliente y la cantidad total de energia acumulada.
+...                   
+...
+sage: #si la unica forma que el sistema transmite energia es por el heat transfer, the heat rate can be used to calculate the
+sage: #energy balance since,
+...            # [del(E_in)/del(T)] - [del(E_out)/del(T)] = integral_line(vector(#phi_q) *vector(dS)--> area superficial
+...            
+...            
+...                                    #MONTE CARLO INTEGRATION
+...            
+...
+sage: #se usan random numbers  --> integral definida
+sage: #un computo de "multidimentional definite integral"
+...           #integral line
+...           #  ----   
+...           #  | 
+...           # /|\
+...           #|   | I = Integral(f(vector(x))dx
+...           #|   |            Ω
+...           # \|/
+...           #---Ω
+...           
+...
+sage: # donde Ω es un subconjunto de R^m, tiene un volumen
+...           #      ----   
+...           #      | 
+...           #      | 
+...           # V =  |   I = Integral(f(vector(x))dx
+...           #      |              Ω
+...           #      |
+...           #    ---Ω
+...             
+...
+sage: #significa ponerle condicion a dos superficies en 2D pero se puede manejar el flujo depende que tipo de inclinacion tengan los 
+sage: #entrantes o los salientes. 
+...                   #graficamente en un plano y z
+...                                      --------------*---------*
+...                                      -------------*-*-------*-
+...                                      -------------*---*-----*--
+...                                      -------------*----*---*---
+...                                      -------------*-----*-*----
+...                                      -------------*------*-----
+...                                      #end of monte carlo
+...                                           #El principio de la conservacion de la energia viene de'
+...
+sage: #                                                                                              (1)
+sage: #     ∇ = ((∂/∂x),(∂/∂y), (∂/z)) = e^x(∂/∂x)+e^y(∂/∂y)+e^z(∂/∂z)
+sage: #donde los versores e^(s_2), son los vectores de unidades en las direcciones x,y,z respectivamente.
+sage: #Desde que V es una subregion R^3 aribitraria, el integrando se asume continuo el integrando tiene que ser 0 en todas partes
+...                                       #cρ(∂u/∂t) + ∇ .  φ - Q = 0                                (2)
+...                                       
+...                                       
+...                                       
+...                                       
+...                                       #FOURIER'S LAW OF HEAT CONDUCTION (3D)
+...                                       
+...
+sage: # La generalizacion del la ley de fourier es:
+...                                                 # φ = -K_0* ∇_u                                  (3)
+...                                                 # donde K_0 es llamada la difusividad termal
+...                                                 #sustituyendo (3) en (2)
+...                                                 
+...                                                 #(∂u/∂t) =  k∇^2_u + (Q/cρ)             (4)
+...                                                 #donde k = k_0/cρ, esa es la 3D heat equation, para el caso de 1D
+...                                                 #
+...                                                 #   x˜ = x/l ,   t˜ = (k/l^2)t,
+...                                               
+...                                                 # donde q = l^2Q/(kcp)=l^2Q/k_0
+...                                               
+...                                       #TRANSFERENCIA DE CALOR POR CONDUCCION
+...
+sage: # Cuando en un medio solido existe un gradiente de temperatura el calor se transmite de la region de mayor temperatura a la
+sage: # de menor temperatura el calor transmitido por unidad de tiempo q_k es proporcional al gradiente de temperatura dT/dx
+sage: # multiplicado por el area a A a traves se transfiere es decir:
+...                                                  
+...                                                 # q_kαAdT/dx
+...                                                
+...
+sage: # x: la direccion del flujo de calor; T:temperatura
+sage: ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+sage: A Mathematical Equation
+sage: So far we have learned of four variables that affect the rate of heat transfer between two locations. The variables are the temperature difference between the two locations, the material present between the two locations, the area through which the heat will be transferred, and the distance it must be transferred. As is often the case in physics, the mathematical relationship between these variables and the rate of heat transfer can be expressed in the form of an equation. Let's consider the transfer of heat through a glass window from the inside of a home with a temperature of T1 to the outside of a home with a temperature of T2. The window has a surface area A and a thickness d. The thermal conductivity value of the window glass is k. The equation relating the heat transfer rate to these variables is
+sage: Rate = k•A•(T1 - T2)/d
+sage: The units on the rate of heat transfer are Joule/second, also known as a Watt. This equation is applicable to any situation in which heat is transferred in the same direction across a flat rectangular wall. It applies to conduction through windows, flat walls, slopes roofs (without any curvature), etc. A slightly different equation applies to conduction through curved walls such as the walls of cans, cups, glasses and pipes. We will not discuss that equation here.
+...                       //////////////////Example Problem////////////////////////////////
+...
+sage: To illustrate the use of the above equation, let's calculate the rate of heat transfer on a cold day through a rectangular window that is 1.2 m wide and 1.8 m high, has a thickness of 6.2 mm, a thermal conductivity value of 0.27 W/m/°C. The temperature inside the home is 21°C and the temperature outside the home is -4°C.
+sage: To solve this problem, we will need to know the surface area of the window. Being a rectangle, we can calculate the area as width • height.
+sage: Area = (1.2 m)•(1.8 m) = 2.16 m2.
+sage: We will also need to give attention to the unit on thickness (d). It is given in units of cm; we will need to convert to units of meters in order for the units to be consistent with that of k and A.
+sage: d = 6.2 mm = 0.0062 m
+sage: Now we are ready to calculate the rate of heat transfer by substitution of known values into the above equation.
+sage: Rate = (0.27 W/m/°C)•(2.16 m2)•(21°C - -4°C)/(0.0062 m)
+sage: Rate = 2400 W (rounded from 2352 W)
+sage: It is useful to note that the thermal conductivity value of a house window is much lower than the thermal conductivity value of glass itself. The thermal conductivity of glass is about 0.96 W/m/°C. Glass windows are constructed as double and triple pane windows with a low pressure inert gas layer between the panes. Furthermore, coatings are placed on the windows to improve efficiency. The result is that there are a series of substances through which heat must consecutively pass in order to be transferred out of (or into) the house. Like electrical resistors placed in series, a series of thermal insulators has an additive effect on the overall resistance offered to the flow of heat. The accumulative effect of the various layers of materials in a window leads to an overall conductivity that is much less than a single pane of uncoated glass.
+...    
+...
+sage: Lesson 1 of this Thermal Physics chapter has focused on the meaning of temperature and heat. Emphasis has been given to the development of a particle model of materials that is capable of explaining the macroscopic observations. Efforts have been made to develop solid conceptual understandings of the topic in the absence of mathematical formulas. This solid conceptual understanding will serve you well as you approach Lesson 2. The chapter will turn slightly more mathematical as we investigate the question: how can the amount of heat released from or gained by a system be measured? Lesson 2 will pertain to the science of calorimetry.
+Syntax Error:
+    #the negative sign says that the heat flux from a higher temperature REGIONS to a lower temperature REGIONS.
+Traceback (most recent call last):
+...
+TypeError: unsupported operand type(s) for ** or pow(): 'R' and 'int'
+sage: u = var('u')
+sage: t = var('t')
+sage: parametric_plot3d((cos(t)*cos(u), sin(t)*cos(u), sin(u)), (u,-pi/2,pi/2), (t,0,2*pi), mesh=true, color='red', axis=true) + parametric_plot3d((3*cos(t)*cos(u), 3*sin(t)*cos(u), sin(u)), (u,-pi/2,pi/2), (t,0,2*pi), opacity=0.1)
+sage: #https://en.wikipedia.org/wiki/Thermal_conduction
+sage: from sage.plot.plot3d.shapes import Box
+sage: u = var('u')
+sage: t = var('t')
+sage: x,y,z=var('x y z')
+sage: cold_sphere = parametric_plot3d((cos(t)*cos(u), sin(t)*cos(u)+7, sin(u)-7), (u,pi/2,3*pi/2), (t,0,2*pi), color='cyan')
+sage: heat_function = animate(parametric_plot3d((cos(t), sin(t), u), (t,0,2*pi), (u,-3,-1), solid=true) + parametric_plot3d((cos(t)*cos(u), sin(t)*cos(u), sin(u)), (u,-pi/2,pi/2), (t,0,2*pi), mesh=true, color='red', axis=true)+parametric_plot3d((7*cos(t)*cos(u), 7*sin(t)*cos(u), 4*sin(u)-3), (u,0,pi/2), (t,0,2*pi), opacity=0.2) + plot_vector_field3d((14*x,14*y,8*z), (x,-3,3), (y,-3,3), (z,-3,1,))+ parametric_plot3d((cos(t)*cos(u)*(1/3)+x, sin(t)*cos(u)*(1/3)+x, sin(u)*(1/3)-x), (u,pi/2,3*pi/2), (t,0,2*pi), color='green', opacity=0.5)+parametric_plot3d((cos(t)*cos(u)*(1/3)-x, sin(t)*cos(u)*(1/3)+x, sin(u)*(1/3)-x), (u,pi/2,3*pi/2), (t,0,2*pi), color='red', opacity=0.5)+cold_sphere for x in srange(0, 4,0.5))
+sage: show(heat_function)
+sage: #https://es.wikipedia.org/wiki/Ecuaci%C3%B3n_del_calor

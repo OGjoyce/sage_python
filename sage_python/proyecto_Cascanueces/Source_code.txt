@@ -1,0 +1,122 @@
+sage: #Engineer function
+sage: def rotate(s,angle,axis = 'x'):
+...       if axis == 'x':
+...           M = matrix([ [1, 0, 0], [0,cos(angle), sin(angle)], [0, -sin(angle), cos(angle)] ] )
+...       elif axis == 'y':
+...           M = matrix([ [cos(angle),0, sin(angle)],[0,1,0],[-sin(angle),0, cos(angle)] ] )
+...       else:
+...           M = matrix([ [cos(angle),sin(angle),0],[-sin(angle), cos(angle),0],[0,0,1] ] )
+...       return s*M.transpose()
+sage: #------------------------------------------The Undead Nutcracker King-------------------------------------
+sage: #Pierna derecha
+sage: r,t,x,y,z,u=var('r t x y z u')
+sage: pantorrilla = parametric_plot3d((cos(t), sin(t), z), (t,0,2*pi), (z,0,4), color='black')
+sage: zapato = parametric_plot3d((y, cos(t), sin(t)), (t,0,2*pi), (y,0,2), color='silver', solid=true) +parametric_plot3d((cos(t)*cos(u), sin(t)*cos(u), sin(u)), (u,pi,2*pi), (t,0,2*pi), color='silver', axis=true)+parametric_plot3d((cos(t)*cos(u)+2, sin(t)*cos(u), sin(u)), (u,pi/2,3*pi/2), (t,0,2*pi), color='silver', axis=true)
+sage: muslo = parametric_plot3d((cos(t), sin(t), z), (t,0,2*pi),(z,5,8), color='blue')
+sage: conexion_pantorrilla = parametric_plot3d((cos(t)*cos(u), sin(t)*cos(u), 4+sin(u)), (u,0,pi), (t,0,2*pi), color='black', axis=true)
+sage: conexion_muslo = parametric_plot3d((cos(t)*cos(u), sin(t)*cos(u), 5+sin(u)), (u,0,pi), (t,0,2*pi), color='blue', axis=true)
+sage: cinta_1 = parametric_plot3d((2,x^3 -0.5,1),(x,-1,1), color='black', solid=true)
+sage: cinta_2 = parametric_plot3d((1.5,x^3 -0.5,1),(x,-1,1), color='black')
+sage: cinta_3 = parametric_plot3d((2.5,x^3 -0.5, 1),(x,-1,1), color='black')
+sage: print("Pierna derecha")
+sage: pierna_derecha = pantorrilla + zapato + muslo + conexion_muslo + conexion_pantorrilla + cinta_1 + cinta_2 + cinta_3
+sage: pierna_derecha.show(aspect_ratio=1, axis=true)
+Pierna derecha
+sage: #Pierna izquierda
+sage: r,t,x,y,z,u=var('r t x y z u')
+sage: pantorrilla = parametric_plot3d((cos(t), sin(t)+2, z), (t,0,2*pi), (z,0,4), color='black')
+sage: zapato = parametric_plot3d((y, cos(t)+2, sin(t)), (t,0,2*pi), (y,0,2), color='silver', solid=true) +parametric_plot3d((cos(t)*cos(u), sin(t)*cos(u)+2, sin(u)), (u,pi,2*pi), (t,0,2*pi), color='silver', axis=true)+parametric_plot3d((cos(t)*cos(u)+2, sin(t)*cos(u)+2, sin(u)), (u,pi/2,3*pi/2), (t,0,2*pi), color='silver', axis=true)
+sage: muslo = parametric_plot3d((cos(t), sin(t)+2, z), (t,0,2*pi),(z,5,8), color='blue')
+sage: conexion_pantorrilla = parametric_plot3d((cos(t)*cos(u), sin(t)*cos(u)+2, 4+sin(u)), (u,0,pi), (t,0,2*pi), color='black', axis=true)
+sage: conexion_muslo = parametric_plot3d((cos(t)*cos(u), sin(t)*cos(u)+2, 5+sin(u)), (u,0,pi), (t,0,2*pi), color='blue', axis=true)
+sage: cinta_1 = parametric_plot3d((2,x^3 -0.5 +2,1),(x,-1,1), color='black', solid=true)
+sage: cinta_2 = parametric_plot3d((1.5,x^3 -0.5+2,1),(x,-1,1), color='black')
+sage: cinta_3 = parametric_plot3d((2.5,x^3 -0.5+2, 1),(x,-1,1), color='black')
+sage: print("Pierna izquierda")
+sage: pierna_izquierda = pantorrilla + zapato + muslo + conexion_muslo + conexion_pantorrilla + cinta_1 + cinta_2 + cinta_3
+sage: pierna_izquierda.show(aspect_ratio=1, axis=true)
+Pierna izquierda
+sage: #pantalon (semi-esfera)
+sage: r,t,z,u,v,p,x,y=var('x y r t z u v p')
+sage: esfera_pantalon = parametric_plot3d((2.2*cos(t)*cos(u), 2.2*sin(t)*cos(u)+0.9, 2.6*sin(u)+7.5), (u,0,pi/2), (t,0,2*pi), color='red')
+sage: pantalon=esfera_pantalon
+sage: pantalon.show(aspect_ratio=1)
+sage: def rotate(s,angle,axis = 'x'):
+...       if axis == 'x':
+...           M = matrix([ [1, 0, 0], [0,cos(angle), sin(angle)], [0, -sin(angle), cos(angle)] ] )
+...       elif axis == 'y':
+...           M = matrix([ [cos(angle),0, sin(angle)],[0,1,0],[-sin(angle),0, cos(angle)] ] )
+...       else:
+...           M = matrix([ [cos(angle),sin(angle),0],[-sin(angle), cos(angle),0],[0,0,1] ] )
+...       return s*M.transpose()
+...
+sage: k = pierna_derecha + pierna_izquierda + pantalon
+sage: k.show(aspect_ratio=1)
+sage: #cinturon (cilindro ancho pero no alto)
+sage: r,t,z,p,x,y,u=var('r,t,z,p,x,y,u')
+sage: cinturon= parametric_plot3d((2*cos(u)+0.2, 2*sin(u)+0.8, t+9), (u,0,2*pi), (t,0,1), color='black')
+sage: #----------------------------------------------circulo torcido cuadradamente----------------------------------------------------------
+sage: f(l) = sgn(l)*sqrt(abs(l))
+sage: x = f(cos(t)) * f(sin(p))
+sage: y = f(sin(t)) * f(sin(p))
+sage: z = f(cos(p))
+sage: #torso de medio
+sage: torso_med_bot = parametric_plot3d((1.5*x+0.4,1.5*y+0.8,2*z+11), (t,0,2*pi), (p, 0, pi),color='red')
+sage: #----------------------------------------------hombros------------------------------------------------------------
+sage: #hombro izquierdo 
+sage: hombro_izquierdo = parametric_plot3d((1.1*cos(t)*sin(p), 1.1*sin(t)*sin(p)+3.1, 4*z+10), (t,0,2*pi),(p,0,2*pi), color='red')
+sage: #hombro derecho
+sage: hombro_derecho = parametric_plot3d((1.1*cos(t)*sin(p), 1.1*sin(t)*sin(p)-1.5, 4*z+10), (t,0,2*pi),(p,0,2*pi), color='red')
+sage: #----------------------------------------------botones------------------------------------------------------------
+sage: boton_1 = parametric_plot3d((0.2*cos(t)*sin(p)+2, 0.2*sin(t)*sin(p)+0.8, 0.2*cos(p)+10.8), (t,0,2*pi),(p,0,pi), color='gold')
+sage: boton_2 = parametric_plot3d((0.2*cos(t)*sin(p)+2, 0.2*sin(t)*sin(p)+0.8, 0.2*cos(p)+11.7), (t,0,2*pi),(p,0,pi), color='gold')
+sage: #----------------------------------------------hombreras(2cilindros)------------------------------------------------------------
+sage: #derecha
+sage: hombrera_derecha = parametric_plot3d((cos(t)*sin(p), sin(t)*sin(p)-1.5, cos(p)+13.5), (t,0,2*pi),(p,pi/4,pi/2), color='white')
+sage: #izquierda
+sage: hombrera_izquierda = parametric_plot3d((cos(t)*sin(p), sin(t)*sin(p)+3.1, cos(p)+13.5), (t,0,2*pi),(p,pi/4,pi/2), color='white')
+sage: #-----------------------------------------------mancuernas------------------------------------------------------------
+sage: #derecha
+sage: mancuerna_derecha = parametric_plot3d((cos(t)*sin(p), sin(t)*sin(p)-1.5, cos(p)+7), (t,0,2*pi),(p,5*pi/4,3*pi/2), color='blue')
+sage: #izquierda
+sage: mancuerna_izquierda = parametric_plot3d((cos(t)*sin(p), sin(t)*sin(p)+3.1, cos(p)+7), (t,0,2*pi),(p,5*pi/4,3*pi/2), color='blue')
+sage: #----------------------------------------------manos-------------------------------------------------------------rgb(255, 0, 0)
+sage: #derecha
+sage: mano_derecha = parametric_plot3d((cos(t)*sin(p), sin(t)*sin(p)-1.5, cos(p)+6.3), (t,0,2*pi),(p,pi,5*pi/3), color=(255,200,201))
+sage: #izquierda
+sage: mano_izquierda = parametric_plot3d((cos(t)*sin(p), sin(t)*sin(p)+3.1, cos(p)+6.3), (t,0,2*pi),(p,pi,5*pi/3), color=(240,200,201))
+sage: revision = torso_med_bot + cinturon + k + hombro_izquierdo + hombro_derecho +boton_1 +boton_2 + hombrera_derecha + hombrera_izquierda + mancuerna_derecha + mancuerna_izquierda + mano_derecha + mano_izquierda
+sage: revision.show(aspect_ratio=1)
+sage: #--------cabeza y corona-------
+sage: #------------------------------------------cabeza-----------------------------------------------------------------
+sage: #craneo
+sage: craneo = parametric_plot3d((2*cos(t)*sin(p), 2*sin(t)*sin(p)+0.8, 2*cos(p)+14.2), (t,0,2*pi), (p, 0, pi/2), color=(240,200,201))
+sage: #ojos
+sage: ojo_iz = parametric_plot3d((2*0.13*cos(t)*sin(p)+1.8,2* 0.2*sin(t)*sin(p)-1+0.8, 2*0.1*cos(p)+0.7+14.5), (t,0,2*pi), (p, 0, 2*pi), color='white') + parametric_plot3d((2*0.1*cos(t)*sin(p)+1.9, 2*0.1*sin(t)*sin(p)-1+0.8, 2*0.1*cos(p)+0.7+14.5), (t,0,2*pi), (p, 0, 2*pi), color='blue')
+sage: ojo_der = parametric_plot3d((2*0.13*cos(t)*sin(p)+1.8, 2*0.2*sin(t)*sin(p)+1+0.8, 2*0.1*cos(p)+0.7+14.5), (t,0,2*pi), (p, 0, 2*pi), color='white') + parametric_plot3d((2*0.1*cos(t)*sin(p)+1.9, 2*0.1*sin(t)*sin(p)+1+0.8, 2*0.1*cos(p)+0.7+14.5), (t,0,2*pi), (p, 0, 2*pi), color='blue')
+sage: #------------------------------------------corona-----------------------------------------------
+sage: x = 0.8*cos(t)
+sage: y = 0.8*sin(t)
+sage: z = p*abs(sin(4*t)^5)*1.2
+sage: corona = parametric_plot3d((2*x,2*y+0.8,2*z+0.7+14.2), (t,0,2*pi), (p, 0, 1), color='gold')
+sage: sombrero = parametric_plot3d((2*0.75*cos(t)*sin(p), 2*0.75*sin(t)*sin(p)+0.8, 2*0.75*cos(p)+0.7+15), (t,0,2*pi), (p, 0, pi), color='blue') + parametric_plot3d((2*0.3*cos(t)*sin(p), 2*0.3*sin(t)*sin(p)+0.8, 2*0.3*cos(p)+1.8+16), (t,0,2*pi), (p, 0, 2*pi), color='red')
+sage: #-----------------------------------------nariz---------------------------------------------
+sage: f(l) = sgn(l)*sqrt(abs(l))
+sage: x_m = f(cos(t)) * f(sin(p))
+sage: y_m = f(sin(t)) * f(sin(p))
+sage: z_m = f(cos(p))
+sage: nariz = parametric_plot3d((2*0.2*x_m+1.8, 2*0.2*y_m+0.8, 2*0.2*cos(p)+0.4+14.2), (t,0 ,2*pi), (p, 0, pi), color = (240,200,201))
+sage: #----------------------------------------demon mouth----------------------------------------
+sage: h=var('h')
+sage: x = 0.8*cos(t)
+sage: y = 0.8*sin(t)
+sage: z = p*abs(sin(6*t)^5)*1.2
+sage: mouth_plane = parametric_plot3d((x_m+1.1,y_m+0.8,0.5*z_m+13.7), (t,0,2*pi), (p,0,pi/2), color=(0.3,0,0)) 
+sage: demon_tooth = parametric_plot3d((f(x)+1.3,1.1*f(y)+0.8,f(z)+13.7), (t,0,2*pi), (p,0,1), color='white')
+sage: demon_mouth = demon_tooth+mouth_plane 
+sage: cabeza = craneo + ojo_iz + ojo_der + corona + sombrero+nariz + demon_mouth
+sage: cabeza.show(aspect_ratio=1)
+sage: cascanueces = cabeza + revision
+sage: cascanueces.show(aspect_ratio=1)
+sage: print("The Undead Nutcracker King")
+The Undead Nutcracker King
