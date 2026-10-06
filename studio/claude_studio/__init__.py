@@ -19,5 +19,6 @@ from . import materials
 from . import render
 from . import image_to_3d
 from . import characters
+from . import gl_export
 
-__all__ = ["scene", "materials", "render", "image_to_3d", "characters"]
+__all__ = ["scene", "materials", "render", "image_to_3d", "characters", "gl_export"]

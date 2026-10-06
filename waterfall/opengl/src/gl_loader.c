@@ -39,6 +39,7 @@ PFNGLUNIFORM1FPROC          glUniform1f;
 PFNGLUNIFORM2FPROC          glUniform2f;
 PFNGLUNIFORM3FPROC          glUniform3f;
 PFNGLUNIFORM1IPROC          glUniform1i;
+PFNGLUNIFORMMATRIX4FVPROC   glUniformMatrix4fv;
 
 #define WF_LOAD(name) \
     do { \
@@ -87,6 +88,7 @@ int wf_gl_load(wf_GLLoadFunc loader) {
     WF_LOAD(glUniform2f);
     WF_LOAD(glUniform3f);
     WF_LOAD(glUniform1i);
+    WF_LOAD(glUniformMatrix4fv);
 
     return ok;
 }

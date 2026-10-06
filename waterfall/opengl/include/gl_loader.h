@@ -62,6 +62,7 @@ extern PFNGLUNIFORM1FPROC          glUniform1f;
 extern PFNGLUNIFORM2FPROC          glUniform2f;
 extern PFNGLUNIFORM3FPROC          glUniform3f;
 extern PFNGLUNIFORM1IPROC          glUniform1i;
+extern PFNGLUNIFORMMATRIX4FVPROC   glUniformMatrix4fv;
 // NOTE: glActiveTexture is intentionally NOT loaded here. It's GL 1.3, so
 // in principle it needs the same runtime loading as everything else below
 // GL 1.2+, but this system's <GL/gl.h> (common on Linux/Mesa, unlike

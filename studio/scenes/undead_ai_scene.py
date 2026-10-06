@@ -84,6 +84,9 @@ def parse_args():
     p.add_argument("--view", choices=list(CAMERAS.keys()), default="three_quarter")
     p.add_argument("--all-views", action="store_true", help="render every camera preset in one run")
     p.add_argument("--samples", type=int, default=96)
+    p.add_argument("--no-render", action="store_true", help="build/export only, skip rendering")
+    p.add_argument("--export-obj", default=None, help="export OBJ+MTL to this path")
+    p.add_argument("--export-gl", default=None, help="export the custom OpenGL binary mesh (+ .json) to this path")
     return p.parse_args(argv)
 
 
@@ -92,17 +95,27 @@ def main():
     cs.scene.reset_scene()
 
     root, parts, tri_count = cs.characters.build_undead_ai(cs.materials)
-    print(f"STUDIO: UndeadAI built from {len(parts)} sub-assemblies, {tri_count} triangles total")
-    for pname, pobj in parts.items():
-        depsgraph = bpy.context.evaluated_depsgraph_get()
-        eval_obj = pobj.evaluated_get(depsgraph)
-        mesh = eval_obj.to_mesh()
-        n = len(mesh.polygons)
-        eval_obj.to_mesh_clear()
-        print(f"STUDIO:   {pname}: {n} triangles")
+    stats = cs.gl_export.report_statistics("UndeadAI", parts)
 
     build_presentation_lighting()
+    lights = [o for o in bpy.data.objects if o.type in ("LIGHT",)]
+    cs.gl_export.organize_collections("UNDEAD_AI", parts, lights=lights)
     setup_glare_compositor()
+
+    if args.export_obj or args.export_gl:
+        # UV coordinates are only needed for export, not for the Cycles
+        # preview renders (which shade from vertex color / flat material
+        # color, not a texture lookup) -- skipped otherwise to keep plain
+        # render iterations fast.
+        cs.gl_export.unwrap_parts(parts)
+        if args.export_obj:
+            cs.gl_export.export_obj_mtl(parts, args.export_obj)
+            print("STUDIO: exported OBJ+MTL to", args.export_obj)
+        if args.export_gl:
+            cs.gl_export.export_gl_binary(parts, args.export_gl)
+
+    if args.no_render:
+        return
 
     views = list(CAMERAS.keys()) if args.all_views else [args.view]
     for view in views:
