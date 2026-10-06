@@ -270,12 +270,38 @@ def build_torso(mats):
         assign_material(strip, mats["DARK_GREEN"] if i < 2 else mats["DARK_METAL"])
         parts.append(strip)
 
+    # corner rivets plus a few extra along the top/bottom edges -- the
+    # first pass only had the 4 corners, which reads as sparse up close
     for dx in (-0.73, 0.73):
         for dy in (0.90, -0.90):
             rivet = add_cylinder(f"TorsoRivet_{dx:.2f}_{dy:.2f}", 0.035, 0.05,
                                   (dx, 2.65 + dy, 0.40), rotation=(math.radians(90), 0, 0), vertices=6)
             assign_material(rivet, mats["DARK_METAL"])
             parts.append(rivet)
+    for dx in (-0.40, 0.0, 0.40):
+        for dy in (0.95, -0.95):
+            rivet = add_cylinder(f"TorsoRivetEdge_{dx:.2f}_{dy:.2f}", 0.03, 0.045,
+                                  (dx, 2.65 + dy, 0.40), rotation=(math.radians(90), 0, 0), vertices=6)
+            assign_material(rivet, mats["DARK_METAL"])
+            parts.append(rivet)
+
+    # side vent plates -- raised armor detailing on the flanks, giving the
+    # silhouette more than one flat slab reads from the side views
+    for dx in (-0.80, 0.80):
+        vent_frame = add_box(f"TorsoVentFrame_{dx:.2f}", (0.10, 0.65, 0.42), (dx, 2.70, 0.0),
+                              bevel_width=0.02, bevel_segments=1)
+        assign_material(vent_frame, mats["LIGHT_METAL"] if dx < 0 else mats["DARK_METAL"])
+        parts.append(vent_frame)
+        for i in range(3):
+            louver = add_box(f"TorsoVentLouver_{dx:.2f}_{i}", (0.055, 0.10, 0.44), (dx, 2.45 + i * 0.22, 0.0))
+            assign_material(louver, mats["CAVITY"])
+            parts.append(louver)
+
+    # a secondary raised shoulder collar plate, following the panel's own
+    # beveled-box language rather than a new primitive type
+    collar = add_box("TorsoCollar", (1.20, 0.16, 0.78), (0, 3.62, 0.0), bevel_width=0.03, bevel_segments=1)
+    assign_material(collar, mats["LIGHT_METAL"])
+    parts.append(collar)
 
     # asymmetric damage per the blueprint: left side clean, right side
     # corroded -- the rusty material carries that asymmetry

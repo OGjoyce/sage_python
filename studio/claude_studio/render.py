@@ -13,13 +13,21 @@ software GL stack being present, which Cycles-CPU doesn't need).
 import bpy
 
 
-def configure_render(engine="CYCLES", samples=32, resolution=(960, 540), denoise=False, filepath=None, transparent=False, device="CPU"):
+def configure_render(engine="CYCLES", samples=32, resolution=(960, 540), denoise=False, filepath=None, transparent=False, device="CPU", view_transform="Standard"):
     scene = bpy.context.scene
     scene.render.engine = engine
     scene.render.resolution_x = resolution[0]
     scene.render.resolution_y = resolution[1]
     scene.render.film_transparent = transparent
     scene.render.image_settings.file_format = "PNG"
+    # Blender 4.x defaults to the "AgX" view transform, a filmic-style
+    # tone-mapper that noticeably desaturates and compresses bright/
+    # saturated colors on its way to the final pixels -- exactly what a
+    # material built from an exact hex spec (MAT_LIVE_GREEN #70FFB0,
+    # MAT_BEACON #FF3030, the procedural rust orange, ...) doesn't want,
+    # since the point was to hit those colors faithfully. "Standard" is a
+    # straight linear-to-sRGB encode with no additional tone-mapping.
+    scene.view_settings.view_transform = view_transform
 
     if engine == "CYCLES":
         scene.cycles.samples = samples
