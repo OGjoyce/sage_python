@@ -81,6 +81,25 @@ float wf_fbm3(vec2 p) {
     return v;
 }
 
+// Deliberately NOT the rotated fbm above: wf_fbm/wf_fbm3 rotate each
+// octave (mat2(1.6,1.2,-1.2,1.6)), which is exactly what you want for
+// isotropic terrain-like noise but actively destroys anisotropic
+// stretching -- feed it a tall, thin UV rectangle and by the second
+// octave the rotation has smeared it back toward round, which is why the
+// first waterfall pass looked like soft blurry clouds instead of falling
+// strands. This version just doubles frequency, no rotation, so a
+// stretched input coordinate stays stretched across every octave.
+float wf_fbmStreak(vec2 p) {
+    float v = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 4; i++) {
+        v += amp * wf_vnoise(p);
+        p *= 2.03;
+        amp *= 0.55;
+    }
+    return v;
+}
+
 // --------------------------------------------------------- flow field ------
 // Stream function: uniform rightward current + turbulent eddies.
 float wf_streamFn(vec2 p, float t) {
@@ -101,6 +120,23 @@ vec2 wf_curl(vec2 p, float t) {
     float dPsiDy = (n1 - n2) / (2.0 * e);
     float dPsiDx = (n3 - n4) / (2.0 * e);
     return vec2(dPsiDy, -dPsiDx);
+}
+
+// ----------------------------------------------------- water height field --
+// A real height field for the river surface: traveling sine waves (true
+// periodic motion, so no seam/looping trick is needed the way it is for
+// the advected fbm below) plus a slower fbm swell for irregularity. Used
+// for both the color banding (wave crests catch light, troughs read
+// deeper) and -- via central differences in wf_render -- a proper surface
+// normal, which is what turns "noise mapped to color" into something with
+// actual specular sparkle instead of a flat painted pattern.
+float wf_waterHeight(vec2 pf, float t) {
+    float h = 0.0;
+    h += 0.45 * sin(pf.x * 2.3 - t * 2.2);
+    h += 0.22 * sin(pf.x * 5.1 + pf.y * 2.0 - t * 3.4 + 1.7);
+    h += 0.16 * sin(pf.y * 7.0 - t * 1.6 + 4.1);
+    h += 0.35 * wf_fbm3(pf * vec2(1.1, 2.6) - vec2(t * 0.55, 0.0));
+    return h;
 }
 
 // ----------------------------------------------------------------- sdf -----
@@ -362,20 +398,48 @@ vec3 wf_render(vec2 fragPx, vec2 res, float time) {
         // y(t) = 0.5*g*t^2 -> the parcel's fall speed grows with how far it
         // has already dropped, so the streak-advection speed increases with
         // fallDrop instead of being a constant scroll.
-        float fallSpeed = 1.5 + 3.2 * fallDrop;
+        float fallSpeed = 1.6 + 3.8 * fallDrop;
         float fallPhase = time * fallSpeed;
-        vec2 streakUV = vec2(p.x * 46.0, p.y * 5.0 - fallPhase * 3.0);
-        // a slow-varying per-column term gives distinct bright/dark rivulets
-        // instead of one uniform sheet of color
-        float colBand = wf_fbm3(vec2(p.x * 9.0, 0.4));
-        float turb = wf_fbm3(streakUV) * 0.65 + wf_fbm3(streakUV * 2.15 + 7.0) * 0.35;
-        float streaks = clamp((turb - 0.30) * 2.6, 0.0, 1.0);
-        streaks = mix(streaks, streaks * (0.5 + 0.9 * colBand), 0.6);
-        vec3 sheet = mix(waterDeep, waterLite, streaks);
-        sheet = mix(sheet, vec3(1.0), pow(streaks, 3.0) * 0.5); // bright highlight cores
+
+        // Distinct vertical strands: split the fall width into ~20 narrow
+        // columns, each with its own hashed width/brightness, and mask
+        // down to a core band per column with a dark gap on either side.
+        // A real cascade is made of separated ribbons of water over
+        // shadowed rock behind them, not one undifferentiated wash --
+        // this is the single biggest lever for "crisp" vs "blurry".
+        float nStrands = 22.0;
+        float strandPos = p.x * nStrands;
+        float strandId = floor(strandPos);
+        float strandFrac = fract(strandPos) - 0.5;
+        float strandHalfWidth = 0.22 + 0.22 * wf_hash12(vec2(strandId, 3.0));
+        float strandBright = 0.55 + 0.6 * wf_hash12(vec2(strandId, 7.0));
+        float strandMask = 1.0 - smoothstep(strandHalfWidth, strandHalfWidth + 0.22, abs(strandFrac));
+
+        // turbulence uses the NON-rotating fbm (wf_fbmStreak) specifically
+        // so the vertical stretch of streakUV survives every octave
+        vec2 streakUV = vec2(p.x * 70.0, p.y * 2.6 - fallPhase * 3.6);
+        float turb = wf_fbmStreak(streakUV) * 0.7 + wf_fbmStreak(streakUV * 2.4 + 11.0) * 0.3;
+        // a sharp-ish threshold (vs. the old wide linear remap) is what
+        // makes individual water ropes read as crisp rather than
+        // soft-edged, without going fully binary/plastic
+        float coreStreaks = smoothstep(0.38, 0.66, turb);
+        // fine high-frequency droplets for close-up detail -- the "HD" bit
+        float droplets = wf_vnoise(vec2(p.x * 160.0, p.y * 34.0 - fallPhase * 6.0));
+        float streaks = clamp(coreStreaks * strandMask + droplets * 0.10 * strandMask, 0.0, 1.0);
+
+        // base tone follows the raw turbulence continuously (not gated by
+        // strandMask), so the strand gaps keep their own mottled texture
+        // instead of reading as a flat, mechanically ruled dark bar
+        vec3 sheet = mix(waterDeep * 0.85, waterMid, clamp(turb * 1.25, 0.0, 1.0));
+        sheet = mix(sheet, waterLite, streaks * (0.55 + 0.3 * strandBright));
+        sheet = mix(sheet, vec3(1.0), pow(streaks, 2.2) * 0.4); // bright highlight cores
+        // the gaps between strands sit in rock shadow -- darken them
+        // multiplicatively (keeps their texture) rather than replacing
+        // with a flat color
+        sheet *= mix(0.55, 1.0, strandMask);
         // turbulent spray increases near the bottom of the fall
-        float spray = smoothstep(0.55, 1.0, fallDrop) * streaks;
-        sheet = mix(sheet, foamC, spray * 0.85);
+        float spray = smoothstep(0.5, 1.0, fallDrop) * streaks;
+        sheet = mix(sheet, foamC, spray * 0.75);
         col = mix(col, sheet, fallMask);
     }
 
@@ -392,52 +456,64 @@ vec3 wf_render(vec2 fragPx, vec2 res, float time) {
         vec2 vDir = normalize(mix(vec2(1.0, 0.0), normalize(vField + 1e-4), 0.45));
         float vSpeed = length(vField) * 0.6 + 0.55;
 
-        // two-phase flow-mapped domain warp: hides the seam of an
-        // ever-scrolling advection by cross-fading two offset phases
-        float cycle = 1.8;
-        float phase1 = mod(time, cycle) / cycle;
-        float phase2 = mod(time + cycle * 0.5, cycle) / cycle;
-        float blend = abs(phase1 * 2.0 - 1.0); // triangle wave 0..1..0
-
-        // Sample noise in a basis aligned to the flow direction, stretched
-        // long along the flow and compressed across it, so features read
-        // as elongated current streaks instead of isotropic blobs (an
-        // isotropic fbm field, whatever its scale, always looks like
+        // Work in a basis aligned to the flow direction, stretched long
+        // along the flow and compressed across it, so features read as
+        // elongated current streaks instead of isotropic blobs (an
+        // isotropic noise field, whatever its scale, always looks like
         // camouflage/ink blots -- it has no preferred direction, and
         // flowing water very much does).
         vec2 flowFwd = vDir;
         vec2 flowSide = vec2(-vDir.y, vDir.x);
-        vec2 pf = vec2(dot(p, flowFwd), dot(p, flowSide));
+        vec2 pf = vec2(dot(p, flowFwd), dot(p, flowSide)) * vec2(1.6, 3.4)
+                - vec2(time * vSpeed * 0.9, 0.0);
 
-        // two noise scales: a slow, large-scale swell for broad light/dark
-        // bands (what the eye reads as "water"), and a finer streak
-        // layered thinly on top -- using only the fine scale at full
-        // contrast is what made this look like marbled soap/cell-outline
-        // wallpaper instead of water.
-        vec2 uv1 = pf * vec2(1.1, 3.2) - vec2(vSpeed * phase1 * cycle, 0.0);
-        vec2 uv2 = pf * vec2(1.1, 3.2) - vec2(vSpeed * phase2 * cycle, 0.0);
-        float swell = mix(wf_fbm3(uv1), wf_fbm3(uv2), blend);
+        // Real height field (sine traveling-waves + fbm swell), differenced
+        // to get an actual surface normal -- this is what makes the
+        // highlight move and sparkle correctly instead of being noise
+        // painted straight to color.
+        float e = 0.025;
+        float hC = wf_waterHeight(pf, time);
+        float hX = wf_waterHeight(pf + vec2(e, 0.0), time);
+        float hY = wf_waterHeight(pf + vec2(0.0, e), time);
+        vec2 gradPf = vec2(hX - hC, hY - hC) / e;
+        vec2 gradP = gradPf.x * flowFwd + gradPf.y * flowSide; // back to screen space
+        // normal strength is deliberately damped (0.14, not the raw
+        // gradient) -- the raw slope of layered sine waves is steep enough
+        // that an undamped normal lights up almost the whole surface,
+        // which is what turned the first pass into a sheet of whitecaps
+        vec3 normal = normalize(vec3(-gradP * 0.14, 1.0));
 
-        vec2 fuv1 = pf * vec2(2.6, 9.0) - vec2(vSpeed * phase1 * cycle * 1.6, 0.0);
-        vec2 fuv2 = pf * vec2(2.6, 9.0) - vec2(vSpeed * phase2 * cycle * 1.6, 0.0);
-        float fine = mix(wf_fbm3(fuv1), wf_fbm3(fuv2), blend);
-
-        float ripple = clamp(swell * 0.7 + fine * 0.3, 0.0, 1.0);
-
-        // depth shading: deeper (farther below its local surface) = darker
+        // wave-crest coloring: crests catch the light and read brighter/
+        // more turquoise, troughs read deeper -- driven by the same height
+        // field that drives the normal, so color and shading agree
+        float waveTone = smoothstep(0.05, 0.75, hC);
         float depth = clamp((riverSurf - p.y) * 7.0, 0.0, 1.0);
-        vec3 wcol = mix(waterLite, waterMid, smoothstep(0.3, 0.7, ripple));
+        vec3 wcol = mix(waterMid, waterLite, waveTone);
         wcol = mix(wcol, waterDeep, depth * 0.5);
 
-        // specular glints: sparse, small highlights from the fine streak
-        // field's own gradient (reusing fuv1 rather than a third sample) --
-        // rare and bright, not a dense web of bright outlines
-        float e = 0.015;
-        float hL = wf_fbm3(fuv1 + vec2(-e, 0.0) * vec2(2.6, 9.0));
-        float hR = wf_fbm3(fuv1 + vec2(e, 0.0) * vec2(2.6, 9.0));
-        float slope = (hR - hL) / (2.0 * e);
-        float glint = smoothstep(0.8, 1.0, abs(slope) * 0.5);
-        wcol = mix(wcol, foamC, glint * 0.35);
+        // a faint, slower-moving second layer suggests a riverbed showing
+        // through shallow water (a cheap stand-in for refraction/caustics)
+        float bed = wf_fbm3(pf * 0.4 + vec2(0.0, 7.0));
+        wcol = mix(wcol, waterMid * 1.15, smoothstep(0.55, 0.8, bed) * (1.0 - depth) * 0.3);
+
+        // specular: real Blinn-Phong off the wave normal, not a slope
+        // threshold -- kept small and rare (high power, low mix) so it
+        // reads as scattered sparkle, not a wash of white
+        vec3 lightDir3 = normalize(vec3(-0.45, 0.55, 0.70));
+        vec3 viewDir3 = vec3(0.0, 0.0, 1.0);
+        vec3 halfVec = normalize(lightDir3 + viewDir3);
+        float spec = pow(clamp(dot(normal, halfVec), 0.0, 1.0), 120.0);
+        wcol = mix(wcol, foamC, clamp(spec * 0.5, 0.0, 0.35));
+
+        // foam riding the wave crests themselves -- whitewater forms where
+        // the surface is steep/breaking, which a height field can express
+        // directly instead of needing a separate decal pass. Gated tight
+        // (high crest threshold, high steepness threshold) so it only
+        // marks the actual peaks, not most of the surface.
+        float steepness = smoothstep(0.65, 1.3, length(gradPf));
+        float crestFoam = smoothstep(0.58, 0.78, hC) * steepness
+                         * smoothstep(0.5, 0.85, wf_fbm3(pf * 2.0 - vec2(time * 0.8, 0.0)));
+        wcol = mix(wcol, foamC, clamp(crestFoam, 0.0, 1.0) * 0.3);
 
         // vorticity-estimated foam: sample curl at a tiny offset and look
         // at how much it differs locally -> shear/vorticity proxy. This is
