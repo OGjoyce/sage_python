@@ -37,6 +37,7 @@ PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray;
 PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation;
 PFNGLUNIFORM1FPROC          glUniform1f;
 PFNGLUNIFORM2FPROC          glUniform2f;
+PFNGLUNIFORM3FPROC          glUniform3f;
 PFNGLUNIFORM1IPROC          glUniform1i;
 
 #define WF_LOAD(name) \
@@ -84,6 +85,7 @@ int wf_gl_load(wf_GLLoadFunc loader) {
     WF_LOAD(glGetUniformLocation);
     WF_LOAD(glUniform1f);
     WF_LOAD(glUniform2f);
+    WF_LOAD(glUniform3f);
     WF_LOAD(glUniform1i);
 
     return ok;

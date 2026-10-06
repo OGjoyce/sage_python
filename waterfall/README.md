@@ -18,10 +18,24 @@ done the way incompressible fluids actually work.
 
 ```
 waterfall/
-  shared/water_core.glsl   <- the entire scene; no main(), no #version
-  threejs/                 <- WebGL build: index.html + main.js
-  opengl/                  <- native GLFW build: CMakeLists.txt + src/
+  shared/water_core.glsl      <- the 2D scene; no main(), no #version
+  shared/water_core_3d.glsl   <- the 3D scene (raymarched SDF); same deal
+  threejs/                    <- WebGL build (2D): index.html + main.js
+  threejs3d/                  <- WebGL build (3D): index.html + main.js
+  opengl/                     <- native GLFW build (2D): CMakeLists.txt + src/
+  opengl3d/                   <- native GLFW build (3D): CMakeLists.txt + src/
 ```
+
+There are two scenes, not one upgraded into the other. `water_core.glsl` is
+a flat fragment-shader "painting": every pixel independently decides
+rock/water/sky from 2D masks, with fake normals bolted on for lighting —
+cheap, but there's no real camera and nothing to orbit. `water_core_3d.glsl`
+is a genuine 3D scene via **sphere-trace raymarching**: a camera shoots one
+ray per pixel into a signed-distance-field description of the cliff,
+boulders, water surface and falls, and marches it forward until it hits
+something. Still pure math, still no mesh assets or textures, still no
+`#version`/`main()` of its own — which is what let it get a native-OpenGL
+twin for free, the same way the 2D scene did.
 
 ## Run it
 
@@ -56,6 +70,13 @@ for N seconds and dumps a PPM (viewable as-is in most image tools, or
 `python3 -c "from PIL import Image; Image.open('out.ppm').save('out.png')"`)
 — this is literally how the two renderers were diffed against each other
 while building this.
+
+**3D (either platform)**: same build steps, `threejs3d/` and `opengl3d/`
+instead of `threejs/`/`opengl/`, binary name `craftflow_waterfall_3d`.
+Drag with the (left) mouse button to orbit, scroll to zoom; it auto-rotates
+when you leave it alone. The native build also takes `--orbit <az> <el>`
+to start at a fixed angle (useful for screenshots) and the same
+`--screenshot`/`--after`/`--pixel-size` flags as the 2D build.
 
 ## Why it looks the way it does (the "optimized, more pixels, hand drawn" part)
 
@@ -111,6 +132,37 @@ output is independent of the resolution of the math:
   dithering + posterization — the 16-bit-era trick for faking more
   gradient steps than the palette allows, applied *after* an explicit
   gamma encode so the bands read as perceptually even.
+
+## The 3D scene (`water_core_3d.glsl`)
+
+Raymarching, briefly: for every pixel, build a camera ray (position +
+direction from the orbit camera), then repeatedly ask a single function
+"what's the distance from this point to the nearest surface in the whole
+scene?" and step the ray forward by that distance. Step enough times and
+the ray either converges onto a surface or runs off to infinity — no
+rasterization, no vertex buffers, no mesh data, the entire scene is just a
+handful of distance functions. The cliff and boulders are literally `box`
+and `sphere` SDFs (smooth-min blended the same way the 2D version blended
+its boulder circles); the water surface is a **solid half-space below a
+height field** (`p.y - waterSurface(p.xz, t)`, which is the correct SDF for
+"everything underneath this surface is water"); the falls are a thin,
+turbulence-bulged slab sitting in a notch boolean-subtracted out of the
+cliff. Normals, which the 2D version had to fake, come for free here from
+the distance field's own gradient (`wf_normal`, central differences) — so
+for the first time the boulders and water get *real* lighting, not a
+fake-sphere or fake-slope hack, plus genuine soft shadows and ambient
+occlusion from marching secondary rays through the same SDF
+(`wf_softShadow`, `wf_ao`).
+
+One bug worth naming because it'll bite anyone doing this for the first
+time: texturing a box-shaped SDF with a single 2D noise projection (e.g.
+`voronoi(p.xy)`) looks right on the face that projection was aimed at and
+stretches into visible banding on every other face, because a side face
+barely moves in `x` or `y` while it sweeps through `z`. The cliff's rock
+texture is projected with a **triplanar blend** instead — three samples
+(`p.yz`, `p.xz`, `p.xy`) weighted by how much the surface normal faces each
+axis — which is the standard fix and the difference between "looks like a
+textured box" and "looks like a rock wall with sides."
 
 ## One shader, two renderers — what that bought us
 
