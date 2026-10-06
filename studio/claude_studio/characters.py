@@ -320,11 +320,14 @@ def build_undead_ai_materials(cs_materials):
         "MAT_FIRE", base_color=_hex(0xFF6A1A), roughness=0.2,
         emission_color=_hex(0xFF7A20), emission_strength=11.0,
     )
-    # MAT_GRIME: a sickly, matte near-black buildup for the nastier dead-arm
-    # cables -- corrosion lumps and kinks, distinct from RUST's orange-brown
-    # oxidation and DARK_METAL's clean structural tone.
+    # MAT_GRIME: a sickly, matte buildup for the nastier dead-arm cables --
+    # corrosion lumps and kinks, distinct from RUST's orange-brown
+    # oxidation and DARK_METAL's clean structural tone. Lightened from an
+    # earlier near-black (0x241C14) that was disappearing into the dark
+    # presentation backdrop almost entirely -- it needs to read as a
+    # grimy, visible material, not vanish.
     mats["GRIME"], _ = cs_materials.new_principled_material(
-        "MAT_GRIME", base_color=_hex(0x241C14), roughness=1.0, metallic=0.0,
+        "MAT_GRIME", base_color=_hex(0x463222), roughness=1.0, metallic=0.0,
     )
 
     return mats
@@ -635,15 +638,29 @@ def build_head(mats):
     assign_material(head_corrosion, mats["RUST"])
     parts.append(head_corrosion)
 
-    # antenna + beacon
-    stem = add_cylinder("AntennaStem", 0.045, 0.30, (0, 5.08, 0), vertices=6)
-    assign_material(stem, mats["DARK_METAL"])
+    # antenna + beacon -- the parts-reference sheet shows this as a
+    # simple, clearly visible light-colored rod with a red cap, no support
+    # wires. The first pass made the stem thin (0.045 radius), dark
+    # (DARK_METAL), AND centered at y=5.08 -- but HeadMain's own top
+    # surface is at y=5.10 (center 4.55 + half-height 0.55), so over half
+    # the old stem's length sat buried inside the head, leaving only a
+    # thin dark sliver actually visible above it. It read as a floating
+    # red dot with nothing visibly holding it up. Rebuilt to sit cleanly
+    # ON the head's top surface, thickened, and switched to LIGHT_METAL.
+    head_top = 5.10
+    base_collar = add_cylinder("AntennaBaseCollar", 0.12, 0.06, (0, head_top + 0.02, 0), vertices=8)
+    assign_material(base_collar, mats["DARK_METAL"])
+    parts.append(base_collar)
+    stem = add_cylinder("AntennaStem", 0.085, 0.30, (0, head_top + 0.17, 0), vertices=8)
+    assign_material(stem, mats["LIGHT_METAL"])
     parts.append(stem)
-    for dx, dz in ((-0.05, 0.02), (0.05, -0.015)):
-        wire = add_cable(f"AntennaWire_{dx:.2f}", [(dx * 0.4, 4.98, 0), (dx, 5.10, dz), (dx * 0.6, 5.22, 0)], radius=0.009)
-        assign_material(wire, mats["DARK_METAL"])
+    for dx, dz in ((-0.07, 0.03), (0.07, -0.025)):
+        wire = add_cable(f"AntennaWire_{dx:.2f}",
+                          [(dx * 0.4, head_top + 0.08, 0), (dx, head_top + 0.22, dz), (dx * 0.6, head_top + 0.36, 0)],
+                          radius=0.016)
+        assign_material(wire, mats["LIGHT_METAL"])
         parts.append(wire)
-    beacon = add_box("Beacon", (0.16, 0.10, 0.12), (0, 5.28, 0), bevel_width=0.025, bevel_segments=1)
+    beacon = add_box("Beacon", (0.18, 0.12, 0.14), (0, head_top + 0.40, 0), bevel_width=0.028, bevel_segments=1)
     assign_material(beacon, mats["BEACON"])
     parts.append(beacon)
 
@@ -651,8 +668,8 @@ def build_head(mats):
     # down past the antenna stem -- the reference sheet's tattered-flag
     # detail on the antenna
     ribbon = add_cable("AntennaRibbon",
-                        [(0.03, 5.22, 0.03), (0.09, 5.00, 0.05), (0.04, 4.75, 0.02), (0.08, 4.58, -0.02)],
-                        radius=0.012, bevel_resolution=1)
+                        [(0.03, 5.42, 0.03), (0.09, 5.20, 0.05), (0.04, 4.95, 0.02), (0.08, 4.78, -0.02)],
+                        radius=0.016, bevel_resolution=1)
     assign_material(ribbon, mats["CLOTH"])
     parts.append(ribbon)
 
@@ -797,7 +814,12 @@ def _build_arm(mats, side, alive):
         # corrupted-color drips where the infection from the sword's aura
         # reads as spreading into the arm itself
         rng = random.Random(44 if side == "Right" else 45)
-        cable_mats = (mats["DARK_METAL"], mats["RUST"], mats["GRIME"])
+        # mostly RUST -- the reference sheet's own "CABLE" isolate is a
+        # consistent warm rust-brown, which reads clearly against a dark
+        # backdrop; the first pass split cables evenly across
+        # DARK_METAL/RUST/GRIME, and the two dark ones made a third of
+        # the "nasty tangle" blend straight into the background
+        cable_mats = (mats["RUST"], mats["RUST"], mats["DARK_METAL"])
 
         def _beads(prefix, pts, mat):
             # a bulge at every interior kink -- a beaded/sausage-link
@@ -823,7 +845,7 @@ def _build_arm(mats, side, alive):
             cable = add_cable(f"{side}ShoulderCable{i}", points, radius=0.021 + 0.005 * (i % 2))
             assign_material(cable, cable_mats[i % 3])
             parts.append(cable)
-            _beads(f"{side}ShoulderCable{i}", points, mats["GRIME"] if i % 2 == 0 else mats["RUST"])
+            _beads(f"{side}ShoulderCable{i}", points, mats["RUST"] if i % 2 == 0 else mats["GRIME"])
 
         for i in range(4):
             y0 = 2.48 - i * 0.24
@@ -837,7 +859,7 @@ def _build_arm(mats, side, alive):
             cable = add_cable(f"{side}ElbowCable{i}", points, radius=0.018)
             assign_material(cable, mats["RUST"] if i % 2 == 0 else mats["GRIME"])
             parts.append(cable)
-            _beads(f"{side}ElbowCable{i}", points, mats["DARK_METAL"])
+            _beads(f"{side}ElbowCable{i}", points, mats["RUST"])
 
         # two small corrupted-color ooze accents -- a hint that whatever
         # is on the sword isn't staying on the sword
