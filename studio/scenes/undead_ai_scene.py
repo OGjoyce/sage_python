@@ -63,19 +63,22 @@ def build_presentation_lighting():
     # scene, and a near-black background makes the emissive plasma reads
     # pop instead of competing with a bright sky.
     #
-    # Character-right (+X, world) is where the damaged/rusty arm lives,
-    # and it's built from the darkest materials in the palette (DARK_METAL,
-    # RUST) specifically to look damaged -- against a near-black backdrop,
-    # "damaged" and "invisible" are one light away from each other. The
-    # first lighting pass put both the key sun AND the rim light on -X
-    # (character-left, the alive/green arm's side), so the dead arm
-    # rendered as a near-silhouette, blending straight into the background.
-    # Key and rim now split one to each side, so both arms stay readable.
+    # Both arms sit close against the torso and share metal tones with it
+    # (RUST on the right/dead arm is dark too), so against a near-black
+    # backdrop either side goes near-invisible the moment its own light is
+    # weaker than the other's. An earlier pass fixed the dead (+X) arm by
+    # moving the rim+a dedicated fill there, but left the alive (-X) arm's
+    # own fill at a much lower energy -- which then made IT disappear
+    # instead. Both sides now get a matched front fill plus their own rim,
+    # so neither arm depends on the key sun alone to read.
     cs.scene.set_world_gradient(top_color=(0.012, 0.014, 0.016, 1.0), bottom_color=(0.03, 0.035, 0.045, 1.0))
-    cs.scene.add_sun(location=(-4, 6, 5), target=(0, 2.5, 0), energy=2.2, angle=0.2)
-    cs.scene.add_area_light(location=(4, 4, -3), target=(0, 2.5, 0), energy=220, size=3.5, color=(0.75, 0.8, 1.0))
-    cs.scene.add_area_light(location=(3.5, 2.2, 3.5), target=(0.9, 2.3, 0), energy=130, size=3, color=(1.0, 0.95, 0.85))
-    cs.scene.add_area_light(location=(-2.5, 1.8, 2.5), target=(0, 2.5, 0), energy=35, size=3, color=(0.7, 0.85, 1.0))
+    cs.scene.add_sun(location=(-4, 6, 5), target=(0, 2.5, 0), energy=2.6, angle=0.2)
+    # right side (+X, dead/rust arm): rim behind + front fill
+    cs.scene.add_area_light(location=(4, 4, -3), target=(0, 2.5, 0), energy=190, size=3.5, color=(0.75, 0.8, 1.0))
+    cs.scene.add_area_light(location=(3.5, 2.2, 3.5), target=(0.9, 2.3, 0), energy=120, size=3, color=(1.0, 0.95, 0.85))
+    # left side (-X, alive/green arm): matching rim + front fill
+    cs.scene.add_area_light(location=(-4, 4, -3), target=(0, 2.5, 0), energy=150, size=3.5, color=(0.7, 0.9, 0.85))
+    cs.scene.add_area_light(location=(-3.5, 2.2, 3.5), target=(-0.9, 2.3, 0), energy=120, size=3, color=(0.85, 1.0, 0.95))
 
 
 def parse_args():
