@@ -242,7 +242,17 @@ def build_undead_ai_materials(cs_materials):
     # MAT_CLOTH: the frayed strap/ribbon material -- dark worn fabric, used
     # for the antenna's tattered hanging cord and as a strap accent.
     mats["CLOTH"], _ = cs_materials.new_principled_material(
-        "MAT_CLOTH", base_color=_hex(0x4A2020), roughness=1.0, metallic=0.0,
+        "MAT_CLOTH", base_color=_hex(0x6B3A22), roughness=1.0, metallic=0.0,
+    )
+
+    # MAT_CORRUPT: the sword's ambient electric field -- a "corrupted"
+    # crimson-magenta, deliberately distinct from the character's own
+    # LIVE_GREEN "alive" glow and BEACON's pure alarm-red, so the aura
+    # reads as something wrong/infected riding on the blade rather than
+    # just another system indicator light.
+    mats["CORRUPT"], _ = cs_materials.new_principled_material(
+        "MAT_CORRUPT", base_color=_hex(0xB4123C), roughness=0.15,
+        emission_color=_hex(0xE81855), emission_strength=14.0,
     )
 
     return mats
@@ -683,27 +693,116 @@ def build_sword(mats):
     assign_material(edge, mats["LIGHT_METAL"])
     parts.append(edge)
 
+    # a recessed fuller running most of the blade's length -- the raised
+    # center ridge/groove the reference sheet shows down the blade,
+    # distinct from the edge highlight (which sits on the actual cutting
+    # edge, not the flat's centerline)
+    fuller = add_box("BladeFuller", (0.05, 1.85, 0.008), (0.0, 1.10, 0.058))
+    assign_material(fuller, mats["CAVITY"])
+    parts.append(fuller)
+
     rust_patch = add_box("BladeRust", (0.20, 0.5, 0.012), (0.0, 0.55, 0.062), bevel_width=0.005)
     assign_material(rust_patch, mats["RUST"])
     parts.append(rust_patch)
+    rust_patch2 = add_box("BladeRust2", (0.12, 0.28, 0.01), (0.14, 1.65, 0.06), bevel_width=0.004,
+                           rotation=(0, 0, math.radians(12)))
+    assign_material(rust_patch2, mats["RUST"])
+    parts.append(rust_patch2)
+
+    # a chipped/notched edge near the upper third -- a nicked blade reads
+    # more "scourge" than a pristine one
+    notch = add_box("BladeNotch", (0.09, 0.14, 0.03), (0.21, 1.78, 0.03), bevel_width=0.01,
+                     rotation=(0, 0, math.radians(-18)))
+    assign_material(notch, mats["CAVITY"])
+    parts.append(notch)
 
     guard = add_box("Guard", (0.75, 0.18, 0.16), (0, 0.0, 0), bevel_width=0.025, bevel_segments=2)
     assign_material(guard, mats["DARK_METAL"])
     parts.append(guard)
+    # flared quillon tips at each end of the crossguard, angled slightly
+    # toward the blade -- reads as an actual forged guard rather than a
+    # plain bar
+    for qx in (-0.41, 0.41):
+        quillon = add_box(f"Quillon_{qx:.2f}", (0.14, 0.16, 0.12), (qx, 0.07, 0),
+                           rotation=(0, 0, -math.copysign(math.radians(22), qx)),
+                           bevel_width=0.015, bevel_segments=1)
+        assign_material(quillon, mats["LIGHT_METAL"])
+        parts.append(quillon)
 
-    handle = add_cylinder("Handle", 0.10, 0.75, (0, -0.45, 0), vertices=10)
+    # rotated so the grip's axis runs along the blade's own length (Y)
+    # instead of the default Z -- an unrotated cylinder here is the same
+    # orientation mistake the hover base had: it looked like a horizontal
+    # log lying across the handle position instead of a grip you'd hold
+    # along the sword's axis.
+    handle = add_cylinder("Handle", 0.10, 0.75, (0, -0.45, 0), rotation=(math.radians(90), 0, 0), vertices=10)
     assign_material(handle, mats["RUST"])
     parts.append(handle)
-    for ry in (-0.15, 0.0, 0.15):
-        ring = add_cylinder(f"HandleRing_{ry:.2f}", 0.12, 0.04, (0, -0.45 + ry, 0), vertices=10)
+    # diagonal leather-wrap strips around the grip (replacing plain rings
+    # with an actual wrap pattern) plus two structural rings bracketing
+    # the grip at the guard/pommel ends
+    for i in range(5):
+        wy = -0.17 - i * 0.11
+        wrap = add_box(f"HandleWrap_{i}", (0.165, 0.075, 0.165), (0, wy, 0),
+                        rotation=(0, 0, math.radians(28 if i % 2 == 0 else -28)))
+        assign_material(wrap, mats["CLOTH"])
+        parts.append(wrap)
+    for ry in (-0.07, -0.83):
+        ring = add_cylinder(f"HandleRing_{ry:.2f}", 0.125, 0.035, (0, ry, 0),
+                             rotation=(math.radians(90), 0, 0), vertices=10)
         assign_material(ring, mats["DARK_METAL"])
         parts.append(ring)
 
-    pommel = add_box("Pommel", (0.28, 0.18, 0.28), (0, -0.87, 0), bevel_width=0.03, bevel_segments=2)
+    pommel = add_cylinder("Pommel", 0.17, 0.20, (0, -0.95, 0), rotation=(math.radians(90), 0, 0), vertices=8)
     assign_material(pommel, mats["DARK_METAL"])
     parts.append(pommel)
+    # a corrupted power-source gem embedded in the pommel -- the visual
+    # source the electric field below reads as radiating from
+    gem = add_cylinder("PommelGem", 0.07, 0.05, (0, -0.95, 0.11), vertices=8)
+    assign_material(gem, mats["CORRUPT"])
+    parts.append(gem)
+
+    _build_corrupt_aura(parts, mats)
 
     return join_parts(parts, "GreatSword")
+
+
+def _build_corrupt_aura(parts, mats):
+    """A crackling, low-poly "electric field" wrapping the blade -- jagged
+    zigzag arcs (angular, not smooth tubes, matching the low-poly cable
+    language used elsewhere) orbiting the blade at varying radii/heights,
+    plus small spark nodes where arcs bunch up. Built in the blade's own
+    local space so it moves with the sword as a single rigid piece."""
+    rng = random.Random(77)
+    blade_top = 2.45
+    for i in range(7):
+        y0 = rng.uniform(0.05, blade_top)
+        y1 = y0 + rng.uniform(0.25, 0.55)
+        y1 = min(y1, blade_top + 0.1)
+        ang0 = rng.uniform(0, 2 * math.pi)
+        ang1 = ang0 + rng.uniform(1.4, 3.2) * rng.choice((-1, 1))
+        r0 = rng.uniform(0.22, 0.40)
+        r1 = rng.uniform(0.22, 0.40)
+        rmid = rng.uniform(0.28, 0.46)
+        angmid = (ang0 + ang1) / 2.0 + rng.uniform(-0.6, 0.6)
+        ymid = (y0 + y1) / 2.0
+        points = [
+            (r0 * math.cos(ang0), y0, r0 * math.sin(ang0)),
+            (rmid * math.cos(angmid), ymid, rmid * math.sin(angmid)),
+            (r1 * math.cos(ang1), y1, r1 * math.sin(ang1)),
+        ]
+        arc = add_cable(f"CorruptArc_{i}", points, radius=0.016, bevel_resolution=0)
+        assign_material(arc, mats["CORRUPT"])
+        parts.append(arc)
+
+    # small crackle nodes scattered along the blade where arcs converge
+    for i in range(5):
+        y = rng.uniform(0.1, blade_top)
+        ang = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(0.18, 0.30)
+        spark = add_box(f"CorruptSpark_{i}", (0.045, 0.045, 0.045),
+                         (r * math.cos(ang), y, r * math.sin(ang)))
+        assign_material(spark, mats["CORRUPT"])
+        parts.append(spark)
 
 
 # ================================================================== build ==
