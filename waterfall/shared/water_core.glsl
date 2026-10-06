@@ -113,6 +113,39 @@ float wf_sdCircle(vec2 p, vec2 c, float r) {
     return length(p - c) - r;
 }
 
+// Worley/cellular noise: returns (F1, F2, cellRandom) -- distance to the
+// nearest feature point, distance to the second-nearest, and a stable
+// per-cell random value. F2-F1 is ~0 exactly on a cell boundary, which is
+// what turns this into convincing cracked rock instead of soft blobs: a
+// smooth noise field has no edges to speak of, but real stone is made of
+// discrete facets with joints between them, and a Voronoi diagram *is*
+// that structure for free.
+vec3 wf_voronoi(vec2 p) {
+    vec2 ip = floor(p);
+    vec2 fp = fract(p);
+    float f1 = 8.0;
+    float f2 = 8.0;
+    float cellVal = 0.0;
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            vec2 neighbor = vec2(float(x), float(y));
+            vec2 seed = neighbor + vec2(
+                wf_hash12(ip + neighbor + vec2(11.0, 0.0)),
+                wf_hash12(ip + neighbor + vec2(0.0, 37.0))
+            );
+            float d = length(seed - fp);
+            if (d < f1) {
+                f2 = f1;
+                f1 = d;
+                cellVal = wf_hash12(ip + neighbor + vec2(99.0, 13.0));
+            } else if (d < f2) {
+                f2 = d;
+            }
+        }
+    }
+    return vec3(f1, f2, cellVal);
+}
+
 // ------------------------------------------------------- dither/palette ----
 // Written as a flat if/else (rather than an array literal + dynamic index)
 // on purpose: GLSL ES 1.00 (WebGL1) allows neither `float[16](...)`
@@ -170,6 +203,28 @@ float wf_bouldersSDF(vec2 p, float AR) {
     d = wf_smin(d, wf_sdCircle(p, vec2(0.885, 0.105) * vec2(AR, 1.0), 0.028 + 0.006 * wf_fbm3(p * 9.0 + 55.0)), 0.025);
     d = wf_smin(d, wf_sdCircle(p, vec2(0.955, 0.175) * vec2(AR, 1.0), 0.034 + 0.006 * wf_fbm3(p * 9.0 + 66.0)), 0.025);
     return d;
+}
+
+// Which single boulder (center, radius) is closest to p -- used to shade
+// each stone as its own little hemisphere (see wf_render) instead of
+// reading the blended SDF's in-plane gradient as a normal. That earlier
+// approach had no component pointing toward the camera, so the "light"
+// traced a flat radial wedge across each disc (it looked like a cone/party
+// hat, not a rock) -- a real round-highlight needs the normal to curve
+// away from the camera at the silhouette, which requires knowing which
+// single sphere we're actually standing on.
+vec3 wf_nearestBoulder(vec2 p, float AR) {
+    vec3 best = vec3(0.0, 0.0, 0.03);
+    float bestD = 1.0e9;
+    vec2 c; float r; float d;
+    c = vec2(0.470, 0.205) * vec2(AR, 1.0); r = 0.042; d = length(p - c) - r; if (d < bestD) { bestD = d; best = vec3(c, r); }
+    c = vec2(0.565, 0.150) * vec2(AR, 1.0); r = 0.030; d = length(p - c) - r; if (d < bestD) { bestD = d; best = vec3(c, r); }
+    c = vec2(0.690, 0.200) * vec2(AR, 1.0); r = 0.046; d = length(p - c) - r; if (d < bestD) { bestD = d; best = vec3(c, r); }
+    c = vec2(0.615, 0.098) * vec2(AR, 1.0); r = 0.026; d = length(p - c) - r; if (d < bestD) { bestD = d; best = vec3(c, r); }
+    c = vec2(0.800, 0.165) * vec2(AR, 1.0); r = 0.038; d = length(p - c) - r; if (d < bestD) { bestD = d; best = vec3(c, r); }
+    c = vec2(0.885, 0.105) * vec2(AR, 1.0); r = 0.028; d = length(p - c) - r; if (d < bestD) { bestD = d; best = vec3(c, r); }
+    c = vec2(0.955, 0.175) * vec2(AR, 1.0); r = 0.034; d = length(p - c) - r; if (d < bestD) { bestD = d; best = vec3(c, r); }
+    return best;
 }
 
 // =============================================================================
@@ -243,46 +298,57 @@ vec3 wf_render(vec2 fragPx, vec2 res, float time) {
     col = mix(col, foliageL, smoothstep(0.45, 0.85, leafNoise) * smoothstep(0.50, 1.0, p.y));
 
     // ---------------------------------------------------------------------
-    // cliff rock face: elongated vertical striations, posterized into bands
-    // (a smooth gradient reads as "fog"; discrete bands read as "painted
-    // rock"), plus a thin dark rim near its silhouette edges.
+    // cliff rock face: a Voronoi diagram stands in for discrete rock
+    // facets (real stone is made of joined chunks, not a smooth gradient),
+    // with dark cracks exactly on cell boundaries, plus ambient occlusion
+    // darkening toward the base and a thin rim at the cliff's silhouette.
     // ---------------------------------------------------------------------
-    float rockShade = wf_fbm(p * vec2(2.4, 7.5));
-    float rockBands = floor(rockShade * 5.0) / 5.0;
-    vec3 rockCol = mix(rockD, rockL, rockBands);
-    float mossMask = smoothstep(0.55, 0.85, wf_fbm3(p * 5.0 + 3.0)) * step(0.5, rockShade);
-    rockCol = mix(rockCol, mossC, mossMask * 0.55);
-    // sparse vertical crack lines: a handful of the ~14 x-cells across the
-    // cliff get a thin dark fissure running most of their height, which
-    // reads as jointed rock instead of a soft blob
-    float crackCell = floor(p.x * 14.0);
-    float crackPick = wf_hash12(vec2(crackCell, 5.0));
-    float crackCenter = 0.5 + 0.3 * (wf_hash12(vec2(crackCell, 8.0)) - 0.5);
-    float crackLine = (1.0 - smoothstep(0.0, 0.05, abs(fract(p.x * 14.0) - crackCenter)))
-                     * step(0.78, crackPick)
-                     * smoothstep(0.0, 0.08, wf_fbm3(vec2(crackCell, p.y * 3.0)) - 0.15);
-    rockCol = mix(rockCol, rockD * 0.3, crackLine * 0.6);
+    float rockLarge = wf_fbm(p * vec2(2.0, 4.5)); // large-scale tonal variation
+    vec3 rockVor = wf_voronoi(p * 10.0 + vec2(rockLarge * 1.5, 0.0));
+    float facetTone = floor(rockVor.z * 4.0) / 4.0; // 4 discrete per-facet tones
+    vec3 rockCol = mix(rockD, rockL, 0.15 + 0.85 * facetTone);
+    rockCol *= 0.70 + 0.45 * rockLarge; // large-scale light/shadow patches
+    float crackEdge = smoothstep(0.0, 0.055, rockVor.y - rockVor.x); // ~0 right on a cell boundary
+    rockCol = mix(rockD * 0.25, rockCol, crackEdge);
+    float mossMask = smoothstep(0.55, 0.85, wf_fbm3(p * 5.0 + 3.0)) * step(0.5, rockLarge);
+    rockCol = mix(rockCol, mossC, mossMask * 0.45);
+    // ambient occlusion: darker where the cliff meets the water
+    float baseAO = smoothstep(riverSurf, riverSurf + 0.18, p.y);
+    rockCol *= mix(0.5, 1.0, baseAO);
     float edgeDist = min(abs(p.y - cliffTop), min(abs(p.x - cliffX1), min(abs(p.x - fallX0), min(abs(p.x - fallX1), abs(p.y - riverSurf)))));
     float rockOutline = 1.0 - smoothstep(0.0, 0.009, edgeDist);
     rockCol = mix(rockCol, rockD * 0.4, rockOutline);
     col = mix(col, rockCol, rockBand);
 
-    // boulders: fake-normal lighting from the SDF's own gradient (cheap,
-    // but a real SDF gradient is a unit normal almost everywhere), plus a
-    // noise shade band and moss on upward-facing surface.
+    // boulders: each one shaded as its own little hemisphere. The normal
+    // gets a synthetic z-component from how far p sits inside the sphere's
+    // footprint (z = sqrt(1-d^2), the standard "fake sphere" trick), which
+    // is what makes the highlight curve round instead of tracing a flat
+    // radial wedge across the disc.
     if (onBoulder > 0.001) {
-        vec2 e = vec2(0.0035, 0.0);
-        float dxp = wf_bouldersSDF(p + e.xy, AR);
-        float dxm = wf_bouldersSDF(p - e.xy, AR);
-        float dyp = wf_bouldersSDF(p + e.yx, AR);
-        float dym = wf_bouldersSDF(p - e.yx, AR);
-        vec2 grad = normalize(vec2(dxp - dxm, dyp - dym) + 1e-5);
-        vec2 lightDir = normalize(vec2(-0.5, 0.8));
-        float lambert = clamp(dot(grad, lightDir) * 0.5 + 0.5, 0.0, 1.0);
-        float bShade = wf_fbm(p * 9.0 + 6.0);
-        vec3 boulderCol = mix(rockD, rockL, clamp(lambert * 0.75 + bShade * 0.35, 0.0, 1.0));
-        float moss2 = smoothstep(0.5, 0.8, wf_fbm3(p * 7.0 + 9.0)) * smoothstep(0.1, 0.5, grad.y);
-        boulderCol = mix(boulderCol, mossC, moss2 * 0.5);
+        vec3 binfo = wf_nearestBoulder(p, AR);
+        vec2 center = binfo.xy;
+        float radius = max(binfo.z, 0.001);
+        vec2 d2 = (p - center) / radius;
+        float distSq = dot(d2, d2);
+        float zc = sqrt(max(1.0 - min(distSq, 1.0), 0.0));
+        vec3 normal = normalize(vec3(d2, zc));
+        vec3 lightDir3 = normalize(vec3(-0.45, 0.55, 0.70));
+        float lambert = clamp(dot(normal, lightDir3), 0.0, 1.0);
+        float ambient = 0.30;
+        float shadeAmt = ambient + (1.0 - ambient) * lambert;
+        vec3 vr = wf_voronoi(p * 24.0 + center * 6.0);
+        float speckTone = floor(vr.z * 3.0) / 3.0;
+        vec3 boulderCol = mix(rockD, rockL, clamp(shadeAmt, 0.0, 1.0));
+        boulderCol *= 0.85 + 0.3 * speckTone;
+        float crackEdge2 = smoothstep(0.0, 0.08, vr.y - vr.x);
+        boulderCol = mix(boulderCol * 0.6, boulderCol, crackEdge2);
+        // rim darkening at grazing angles -- this is what actually reads
+        // as "round" (a flat disc has no silhouette falloff at all)
+        float rim = 1.0 - smoothstep(0.0, 0.35, normal.z);
+        boulderCol = mix(boulderCol, rockD * 0.35, rim * 0.6);
+        float moss2 = smoothstep(0.5, 0.8, wf_fbm3(p * 7.0 + 9.0)) * smoothstep(0.1, 0.6, normal.y);
+        boulderCol = mix(boulderCol, mossC, moss2 * 0.4);
         col = mix(col, boulderCol, onBoulder);
     }
 
@@ -333,24 +399,45 @@ vec3 wf_render(vec2 fragPx, vec2 res, float time) {
         float phase2 = mod(time + cycle * 0.5, cycle) / cycle;
         float blend = abs(phase1 * 2.0 - 1.0); // triangle wave 0..1..0
 
-        vec2 uv1 = p * 6.0 - vDir * vSpeed * phase1 * cycle;
-        vec2 uv2 = p * 6.0 - vDir * vSpeed * phase2 * cycle;
-        float n1 = wf_fbm3(uv1);
-        float n2 = wf_fbm3(uv2);
-        float ripple = mix(n1, n2, blend);
+        // Sample noise in a basis aligned to the flow direction, stretched
+        // long along the flow and compressed across it, so features read
+        // as elongated current streaks instead of isotropic blobs (an
+        // isotropic fbm field, whatever its scale, always looks like
+        // camouflage/ink blots -- it has no preferred direction, and
+        // flowing water very much does).
+        vec2 flowFwd = vDir;
+        vec2 flowSide = vec2(-vDir.y, vDir.x);
+        vec2 pf = vec2(dot(p, flowFwd), dot(p, flowSide));
+
+        // two noise scales: a slow, large-scale swell for broad light/dark
+        // bands (what the eye reads as "water"), and a finer streak
+        // layered thinly on top -- using only the fine scale at full
+        // contrast is what made this look like marbled soap/cell-outline
+        // wallpaper instead of water.
+        vec2 uv1 = pf * vec2(1.1, 3.2) - vec2(vSpeed * phase1 * cycle, 0.0);
+        vec2 uv2 = pf * vec2(1.1, 3.2) - vec2(vSpeed * phase2 * cycle, 0.0);
+        float swell = mix(wf_fbm3(uv1), wf_fbm3(uv2), blend);
+
+        vec2 fuv1 = pf * vec2(2.6, 9.0) - vec2(vSpeed * phase1 * cycle * 1.6, 0.0);
+        vec2 fuv2 = pf * vec2(2.6, 9.0) - vec2(vSpeed * phase2 * cycle * 1.6, 0.0);
+        float fine = mix(wf_fbm3(fuv1), wf_fbm3(fuv2), blend);
+
+        float ripple = clamp(swell * 0.7 + fine * 0.3, 0.0, 1.0);
 
         // depth shading: deeper (farther below its local surface) = darker
         float depth = clamp((riverSurf - p.y) * 7.0, 0.0, 1.0);
-        vec3 wcol = mix(waterLite, waterMid, clamp(ripple * 1.3, 0.0, 1.0));
-        wcol = mix(wcol, waterDeep, depth * 0.55);
+        vec3 wcol = mix(waterLite, waterMid, smoothstep(0.3, 0.7, ripple));
+        wcol = mix(wcol, waterDeep, depth * 0.5);
 
-        // specular glints: a cheap fake-normal from the ripple gradient
-        float e = 0.01;
-        float hL = wf_fbm3((p + vec2(-e, 0.0)) * 6.0 - vDir * vSpeed * phase1 * cycle);
-        float hR = wf_fbm3((p + vec2(e, 0.0)) * 6.0 - vDir * vSpeed * phase1 * cycle);
+        // specular glints: sparse, small highlights from the fine streak
+        // field's own gradient (reusing fuv1 rather than a third sample) --
+        // rare and bright, not a dense web of bright outlines
+        float e = 0.015;
+        float hL = wf_fbm3(fuv1 + vec2(-e, 0.0) * vec2(2.6, 9.0));
+        float hR = wf_fbm3(fuv1 + vec2(e, 0.0) * vec2(2.6, 9.0));
         float slope = (hR - hL) / (2.0 * e);
-        float glint = smoothstep(0.4, 0.6, abs(slope));
-        wcol = mix(wcol, foamC, glint * 0.25);
+        float glint = smoothstep(0.8, 1.0, abs(slope) * 0.5);
+        wcol = mix(wcol, foamC, glint * 0.35);
 
         // vorticity-estimated foam: sample curl at a tiny offset and look
         // at how much it differs locally -> shear/vorticity proxy. This is
