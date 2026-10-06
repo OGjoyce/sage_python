@@ -11,11 +11,39 @@ def reset_scene():
 
 
 def look_at(obj, target):
-    """Point obj's local -Z axis at `target` (the convention Blender cameras
-    and spot/sun lights use for their forward direction)."""
-    direction = mathutils.Vector(target) - mathutils.Vector(obj.location)
-    rot_quat = direction.to_track_quat("-Z", "Y")
-    obj.rotation_euler = rot_quat.to_euler()
+    """Point obj's local -Z axis at `target`, local +Y up (the convention
+    Blender cameras and spot/sun lights use for their forward direction).
+
+    Built from explicit basis vectors (forward/right/up via cross
+    products) rather than Vector.to_track_quat('-Z','Y'), which this
+    function used originally: for at least one direction that is exactly
+    horizontal (zero world-Y component) but not axis-aligned -- e.g.
+    target-location = (-6, 0, -8), as opposed to (0, 0, -10.5), which
+    worked fine -- to_track_quat returned a quaternion with a genuine 90
+    degree roll baked in (verified by dumping rotation_euler), rendering
+    the entire scene sideways with no error of any kind. The explicit
+    basis-vector construction is the same technique used for the raymarch
+    camera in water_core_3d.glsl, and has no such edge case."""
+    pos = mathutils.Vector(obj.location)
+    tgt = mathutils.Vector(target)
+    forward = (tgt - pos)
+    if forward.length < 1e-9:
+        return obj  # target == position, nothing to orient toward
+    forward.normalize()
+
+    world_up = mathutils.Vector((0.0, 1.0, 0.0))
+    if abs(forward.dot(world_up)) > 0.999:
+        world_up = mathutils.Vector((0.0, 0.0, 1.0))  # looking ~straight up/down: avoid a degenerate cross product
+
+    right = forward.cross(world_up).normalized()
+    up = right.cross(forward).normalized()
+
+    rot_mat = mathutils.Matrix((
+        (right.x, up.x, -forward.x),
+        (right.y, up.y, -forward.y),
+        (right.z, up.z, -forward.z),
+    ))
+    obj.rotation_euler = rot_mat.to_euler()
     return obj
 
 

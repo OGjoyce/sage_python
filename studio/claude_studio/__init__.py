@@ -18,5 +18,6 @@ from . import scene
 from . import materials
 from . import render
 from . import image_to_3d
+from . import characters
 
-__all__ = ["scene", "materials", "render", "image_to_3d"]
+__all__ = ["scene", "materials", "render", "image_to_3d", "characters"]
