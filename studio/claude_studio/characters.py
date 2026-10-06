@@ -466,17 +466,13 @@ def build_torso(mats):
     assign_material(collar, mats["LIGHT_METAL"])
     parts.append(collar)
 
-    # a faceted octagonal "shoulder yoke" chamfering the torso's top down
-    # toward the neck -- the parts-reference sheet shows the torso's top
-    # as a distinct angled, faceted roof rather than the flat rectangular
-    # top TorsoMain's own bevel alone produces (a single Bevel modifier
-    # chamfers every edge equally, it can't selectively steepen just the
-    # top corners), so this is a separate tapered octagonal cap sitting
-    # right above the collar.
-    yoke = add_cone("TorsoShoulderYoke", 0.90, 0.62, 0.16, (0, 3.70, 0),
-                     rotation=(math.radians(90), 0, 0), vertices=8)
-    assign_material(yoke, mats["METAL"])
-    parts.append(yoke)
+    # (an earlier pass tried a tapered octagonal cone cap here to chamfer
+    # the top -- it didn't sit flush with TorsoMain's own rectangular
+    # corners, so it read as a separate hat floating above the torso
+    # instead of part of it, and exposed the edge rivets underneath as
+    # floating debris. Removed; TorsoMain's own bevel plus the collar
+    # plate above already chamfer the top reasonably without introducing
+    # a shape that doesn't actually fit the box it sits on.)
 
     # a narrower, recessed waist panel across the lower torso -- the single
     # flat TorsoMain slab read as a plain monolithic block next to the
@@ -494,21 +490,27 @@ def build_torso(mats):
         parts.append(seam_rivet)
 
     # asymmetric damage per the blueprint: left side clean, right side
-    # corroded -- the rusty material carries that asymmetry
-    corrosion_r = add_box("TorsoCorrosionR", (0.45, 0.85, 0.035), (0.45, 2.55, 0.40), bevel_width=0.015)
+    # corroded -- the rusty material carries that asymmetry. Kept as small
+    # accent patches (an earlier pass sized these at 0.45x0.85 -- nearly
+    # half the torso's own width/height -- which read as two large slabs
+    # pasted over the front rather than weathering)
+    corrosion_r = add_box("TorsoCorrosionR", (0.22, 0.38, 0.03), (0.62, 2.40, 0.40), bevel_width=0.01)
     assign_material(corrosion_r, mats["RUST"])
     parts.append(corrosion_r)
-    corrosion_l = add_box("TorsoCorrosionL", (0.18, 0.40, 0.03), (-0.60, 2.95, 0.40), bevel_width=0.01)
+    corrosion_r2 = add_box("TorsoCorrosionR2", (0.14, 0.20, 0.025), (0.58, 3.05, 0.40), bevel_width=0.008)
+    assign_material(corrosion_r2, mats["RUST"])
+    parts.append(corrosion_r2)
+    corrosion_l = add_box("TorsoCorrosionL", (0.13, 0.22, 0.025), (-0.62, 2.95, 0.40), bevel_width=0.008)
     assign_material(corrosion_l, mats["RUST"])
     parts.append(corrosion_l)
 
-    # moss/grime blotches mottled across the plating -- heavier on the
-    # damaged (+X) side, light scatter on the clean side, matching the
-    # reference sheet's weathered-patina look rather than flat clean metal
+    # moss/grime blotches mottled across the plating -- small scattered
+    # specks, heavier on the damaged (+X) side -- matching the reference
+    # sheet's subtle weathered-patina look rather than flat clean metal
     scatter_patches(parts, mats, "MOSS", "TorsoMossR", center=(0.55, 2.55, 0.40),
-                     spread=(0.35, 0.55), count=10, size_range=(0.06, 0.15), seed=11)
+                     spread=(0.35, 0.55), count=8, size_range=(0.035, 0.07), seed=11)
     scatter_patches(parts, mats, "MOSS", "TorsoMossL", center=(-0.45, 2.70, 0.40),
-                     spread=(0.25, 0.45), count=5, size_range=(0.05, 0.11), seed=12)
+                     spread=(0.25, 0.45), count=4, size_range=(0.03, 0.06), seed=12)
 
     return join_parts(parts, "Torso")
 
@@ -744,7 +746,7 @@ def _build_arm(mats, side, alive):
             # chain read (per the parts-reference sheet's "CABLE" isolate)
             # instead of a smooth uniform tube
             for bi, p in enumerate(pts[1:-1]):
-                bead = add_box(f"{prefix}_Bead{bi}", (0.05, 0.055, 0.05), p,
+                bead = add_box(f"{prefix}_Bead{bi}", (0.065, 0.07, 0.065), p,
                                 rotation=(0, 0, rng.uniform(0, math.pi)))
                 assign_material(bead, mat)
                 parts.append(bead)
@@ -760,7 +762,7 @@ def _build_arm(mats, side, alive):
                 kink2,
                 (base_x * 1.20, y0 - 0.42, -0.07),
             ]
-            cable = add_cable(f"{side}ShoulderCable{i}", points, radius=0.015 + 0.004 * (i % 2))
+            cable = add_cable(f"{side}ShoulderCable{i}", points, radius=0.021 + 0.005 * (i % 2))
             assign_material(cable, cable_mats[i % 3])
             parts.append(cable)
             _beads(f"{side}ShoulderCable{i}", points, mats["GRIME"] if i % 2 == 0 else mats["RUST"])
@@ -774,7 +776,7 @@ def _build_arm(mats, side, alive):
                 (base_x * 1.34, y0 - 0.24, -0.11),
                 (base_x * 1.14, y0 - 0.38, -0.04),
             ]
-            cable = add_cable(f"{side}ElbowCable{i}", points, radius=0.013)
+            cable = add_cable(f"{side}ElbowCable{i}", points, radius=0.018)
             assign_material(cable, mats["RUST"] if i % 2 == 0 else mats["GRIME"])
             parts.append(cable)
             _beads(f"{side}ElbowCable{i}", points, mats["DARK_METAL"])
