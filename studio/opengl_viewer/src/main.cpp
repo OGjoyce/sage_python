@@ -281,6 +281,10 @@ int main(int argc, char** argv) {
     float paletteLevels = 20.0f;
     std::string screenshotPath;
     double screenshotAfter = 1.5;
+    std::string turntableDir;
+    int turntableFrames = 0;
+    double turntableSeconds = 4.0;
+    double turntableEl = 0.30;
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--mesh") && i + 1 < argc) meshPath = argv[++i];
@@ -293,6 +297,12 @@ int main(int argc, char** argv) {
             g_orbitEl = atof(argv[++i]);
             g_autorotate = false;
         }
+        else if (!strcmp(argv[i], "--turntable") && i + 2 < argc) {
+            turntableDir = argv[++i];
+            turntableFrames = atoi(argv[++i]);
+        }
+        else if (!strcmp(argv[i], "--turntable-seconds") && i + 1 < argc) turntableSeconds = atof(argv[++i]);
+        else if (!strcmp(argv[i], "--turntable-el") && i + 1 < argc) turntableEl = atof(argv[++i]);
     }
 
     UaigMesh mesh = loadUaig(meshPath);
@@ -392,6 +402,82 @@ int main(int argc, char** argv) {
         minZ = fminf(minZ, v.pz); maxZ = fmaxf(maxZ, v.pz);
     }
     Vec3 target = {(minX + maxX) * 0.5f, (minY + maxY) * 0.5f, (minZ + maxZ) * 0.5f};
+
+    // ---- turntable mode: render N frames of a full rotation to disk and
+    // exit, instead of opening the interactive window loop. One process,
+    // one GL context/shader-compile, N cheap re-renders -- much faster
+    // than spawning the whole app per frame the way a single --screenshot
+    // capture does. ----
+    if (!turntableDir.empty() && turntableFrames > 0) {
+        for (int fi = 0; fi < turntableFrames; fi++) {
+            double frameT = (double)fi / (double)turntableFrames * turntableSeconds;
+            g_orbitAz = (double)fi / (double)turntableFrames * 2.0 * M_PI;
+            g_orbitEl = turntableEl;
+
+            Vec3 eye = {
+                target.x + (float)(g_orbitDist * cos(g_orbitEl) * sin(g_orbitAz)),
+                target.y + (float)(g_orbitDist * sin(g_orbitEl)),
+                target.z + (float)(g_orbitDist * cos(g_orbitEl) * cos(g_orbitAz)),
+            };
+            Mat4 view = mat4_lookat(eye, target, Vec3{0, 1, 0});
+            Mat4 proj = mat4_perspective(50.0f * (float)M_PI / 180.0f, 1.0f, 0.1f, 100.0f);
+            Mat4 vp = mat4_mul(proj, view);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glViewport(0, 0, internalRes, internalRes);
+            glClearColor(0.03f, 0.035f, 0.045f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glEnable(GL_DEPTH_TEST);
+            glUseProgram(meshProg);
+            glUniformMatrix4fv(uMVP, 1, GL_FALSE, vp.m);
+            glUniform3f(uLightDir1, -0.45f, 0.70f, 0.55f);
+            glUniform3f(uLightDir2, 0.6f, 0.3f, -0.4f);
+            glUniform1f(uTime, (float)frameT);
+            glBindVertexArray(vao);
+            for (size_t smi = 0; smi < mesh.submeshes.size(); smi++) {
+                auto& sm = mesh.submeshes[smi];
+                const GLMaterial& mat = mesh.materials[sm.materialIndex];
+                glUniform3f(uBaseColor, mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]);
+                glUniform3f(uEmission, mat.emission[0], mat.emission[1], mat.emission[2]);
+                float seed = fmodf((float)smi * 0.6180339887f, 1.0f);
+                glUniform1f(uFlickerSeed, seed);
+                glDrawElements(GL_TRIANGLES, sm.indexCount, GL_UNSIGNED_INT,
+                                (void*)(uintptr_t)(sm.indexOffset * sizeof(uint32_t)));
+            }
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            int fbW, fbH;
+            glfwGetFramebufferSize(window, &fbW, &fbH);
+            glViewport(0, 0, fbW, fbH);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glDisable(GL_DEPTH_TEST);
+            glUseProgram(presentProg);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, colorTex);
+            glUniform1i(uTex, 0);
+            glUniform1f(uLevels, paletteLevels);
+            glBindVertexArray(presentVao);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+
+            std::vector<uint8_t> pixels((size_t)fbW * fbH * 3);
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glReadPixels(0, 0, fbW, fbH, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+            std::vector<uint8_t> flipped((size_t)fbW * fbH * 3);
+            for (int y = 0; y < fbH; y++)
+                memcpy(&flipped[(size_t)y * fbW * 3], &pixels[(size_t)(fbH - 1 - y) * fbW * 3], (size_t)fbW * 3);
+            char outPath[1024];
+            snprintf(outPath, sizeof(outPath), "%s/frame_%04d.ppm", turntableDir.c_str(), fi);
+            std::ofstream out(outPath, std::ios::binary);
+            out << "P6\n" << fbW << " " << fbH << "\n255\n";
+            out.write(reinterpret_cast<char*>(flipped.data()), flipped.size());
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+        }
+        printf("turntable: wrote %d frames to %s\n", turntableFrames, turntableDir.c_str());
+        glfwTerminate();
+        return 0;
+    }
 
     double t0 = glfwGetTime();
     bool shotTaken = screenshotPath.empty();
