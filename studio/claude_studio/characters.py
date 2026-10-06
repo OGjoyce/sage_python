@@ -20,6 +20,7 @@ for mechanical discs/vertebrae, and curves-converted-to-mesh for cables
 import math
 import random
 import bpy
+import bmesh
 
 
 # ============================================================ primitives ===
@@ -38,6 +39,50 @@ def add_box(name, dims, location, rotation=(0.0, 0.0, 0.0), bevel_width=0.0, bev
         bev = obj.modifiers.new("Bevel", "BEVEL")
         bev.width = bevel_width
         bev.segments = bevel_segments  # low-poly: 1-2, never 8-16
+    obj.modifiers.new("Triangulate", "TRIANGULATE")
+    return obj
+
+
+def add_tapered_box(name, bottom_dims, top_dims, height, location, bevel_width=0.0, bevel_segments=1):
+    """A box that tapers between a wider/narrower footprint at the bottom
+    and top -- e.g. the torso's shoulders-wider/waist-narrower silhouette,
+    which a uniform add_box can't produce (its own scale stretches both
+    ends equally, it can't taper one end against the other). `bottom_dims`
+    and `top_dims` are each (width, depth) at that end; `height` is the Y
+    extent between them, matching add_box's own (width, height, depth)
+    dimension order elsewhere in this file."""
+    bw, bd = bottom_dims
+    tw, td = top_dims
+    h = height
+    bm = bmesh.new()
+    vb = [
+        bm.verts.new((-bw / 2, -h / 2, -bd / 2)),
+        bm.verts.new((bw / 2, -h / 2, -bd / 2)),
+        bm.verts.new((bw / 2, -h / 2, bd / 2)),
+        bm.verts.new((-bw / 2, -h / 2, bd / 2)),
+    ]
+    vt = [
+        bm.verts.new((-tw / 2, h / 2, -td / 2)),
+        bm.verts.new((tw / 2, h / 2, -td / 2)),
+        bm.verts.new((tw / 2, h / 2, td / 2)),
+        bm.verts.new((-tw / 2, h / 2, td / 2)),
+    ]
+    bm.faces.new(vb)
+    bm.faces.new(vt)
+    for i in range(4):
+        j = (i + 1) % 4
+        bm.faces.new([vb[i], vb[j], vt[j], vt[i]])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    mesh = bpy.data.meshes.new(f"{name}_mesh")
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.location = location
+    if bevel_width > 0:
+        bev = obj.modifiers.new("Bevel", "BEVEL")
+        bev.width = bevel_width
+        bev.segments = bevel_segments
     obj.modifiers.new("Triangulate", "TRIANGULATE")
     return obj
 
@@ -404,7 +449,12 @@ def build_vertebra_stack(mats, name, count, start_y, spacing, radius, height, si
 
 def build_torso(mats):
     parts = []
-    main = add_box("TorsoMain", (1.65, 2.05, 0.75), (0, 2.65, 0), bevel_width=0.10, bevel_segments=2)
+    # tapered -- wider at the shoulders, narrower at the waist, per the
+    # reference sheet's own torso silhouette. A uniform add_box can't do
+    # this (scale stretches both ends equally), so this is a real tapered
+    # frustum via add_tapered_box.
+    main = add_tapered_box("TorsoMain", bottom_dims=(1.30, 0.65), top_dims=(1.65, 0.75),
+                            height=2.05, location=(0, 2.65, 0), bevel_width=0.10, bevel_segments=2)
     assign_material(main, mats["METAL"])
     parts.append(main)
 
@@ -434,11 +484,14 @@ def build_torso(mats):
         parts.append(led)
 
     # corner rivets plus a few extra along the top/bottom edges -- the
-    # first pass only had the 4 corners, which reads as sparse up close
+    # first pass only had the 4 corners, which reads as sparse up close.
+    # Pulled in on the bottom row (dy < 0) to track the tapered waist --
+    # at the old fixed +-0.73, the bottom corners now sit outside the
+    # narrower waist and float past the actual surface edge.
     for dx in (-0.73, 0.73):
-        for dy in (0.90, -0.90):
+        for dy, inset_dx in ((0.90, dx), (-0.90, math.copysign(0.56, dx))):
             rivet = add_cylinder(f"TorsoRivet_{dx:.2f}_{dy:.2f}", 0.035, 0.05,
-                                  (dx, 2.65 + dy, 0.40), rotation=(math.radians(90), 0, 0), vertices=6)
+                                  (inset_dx, 2.65 + dy, 0.40), rotation=(math.radians(90), 0, 0), vertices=6)
             assign_material(rivet, mats["DARK_METAL"])
             parts.append(rivet)
     for dx in (-0.40, 0.0, 0.40):
@@ -449,8 +502,12 @@ def build_torso(mats):
             parts.append(rivet)
 
     # side vent plates -- raised armor detailing on the flanks, giving the
-    # silhouette more than one flat slab reads from the side views
-    for dx in (-0.80, 0.80):
+    # silhouette more than one flat slab reads from the side views. Pulled
+    # in slightly from +-0.80 to track the tapered torso's narrower width
+    # at this height (a small intentional overhang, like a bolted-on
+    # plate, is fine; the old fixed offset overhung by far more once the
+    # body itself tapers inward here)
+    for dx in (-0.76, 0.76):
         vent_frame = add_box(f"TorsoVentFrame_{dx:.2f}", (0.10, 0.65, 0.42), (dx, 2.70, 0.0),
                               bevel_width=0.02, bevel_segments=1)
         assign_material(vent_frame, mats["LIGHT_METAL"] if dx < 0 else mats["DARK_METAL"])
@@ -474,16 +531,13 @@ def build_torso(mats):
     # plate above already chamfer the top reasonably without introducing
     # a shape that doesn't actually fit the box it sits on.)
 
-    # a narrower, recessed waist panel across the lower torso -- the single
-    # flat TorsoMain slab read as a plain monolithic block next to the
-    # reference sheet's more segmented, tapered silhouette. This breaks the
-    # torso into a visibly wider chest / narrower waist without having to
-    # re-anchor every existing chest/vent/rivet position against a real
-    # split.
-    waist = add_box("TorsoWaist", (1.46, 0.72, 0.70), (0, 2.05, -0.01), bevel_width=0.05, bevel_segments=2)
-    assign_material(waist, mats["DARK_METAL"])
-    parts.append(waist)
-    for dx in (-0.70, -0.23, 0.23, 0.70):
+    # (an earlier pass faked a narrower waist with a separate recessed
+    # inset box here, since TorsoMain was a uniform-width slab. Now that
+    # TorsoMain itself actually tapers, that inset is gone -- at its old
+    # 1.46 width it would now sit WIDER than the real tapered surface at
+    # that height and stick out past the body instead of recessing into
+    # it. A simple seam line stands in for the belt/panel-break read.)
+    for dx in (-0.62, -0.21, 0.21, 0.62):
         seam_rivet = add_cylinder(f"WaistSeamRivet_{dx:.2f}", 0.03, 0.045, (dx, 2.41, 0.40),
                                    rotation=(math.radians(90), 0, 0), vertices=6)
         assign_material(seam_rivet, mats["LIGHT_METAL"])
@@ -494,23 +548,27 @@ def build_torso(mats):
     # accent patches (an earlier pass sized these at 0.45x0.85 -- nearly
     # half the torso's own width/height -- which read as two large slabs
     # pasted over the front rather than weathering)
-    corrosion_r = add_box("TorsoCorrosionR", (0.22, 0.38, 0.03), (0.62, 2.40, 0.40), bevel_width=0.01)
+    # pulled in from the old fixed +-0.58/0.62 so these stay on the now-
+    # tapered surface instead of floating past its edge toward the waist
+    corrosion_r = add_box("TorsoCorrosionR", (0.20, 0.34, 0.03), (0.52, 2.40, 0.40), bevel_width=0.01)
     assign_material(corrosion_r, mats["RUST"])
     parts.append(corrosion_r)
-    corrosion_r2 = add_box("TorsoCorrosionR2", (0.14, 0.20, 0.025), (0.58, 3.05, 0.40), bevel_width=0.008)
+    corrosion_r2 = add_box("TorsoCorrosionR2", (0.13, 0.18, 0.025), (0.52, 3.05, 0.40), bevel_width=0.008)
     assign_material(corrosion_r2, mats["RUST"])
     parts.append(corrosion_r2)
-    corrosion_l = add_box("TorsoCorrosionL", (0.13, 0.22, 0.025), (-0.62, 2.95, 0.40), bevel_width=0.008)
+    corrosion_l = add_box("TorsoCorrosionL", (0.12, 0.20, 0.025), (-0.55, 2.95, 0.40), bevel_width=0.008)
     assign_material(corrosion_l, mats["RUST"])
     parts.append(corrosion_l)
 
     # moss/grime blotches mottled across the plating -- small scattered
     # specks, heavier on the damaged (+X) side -- matching the reference
-    # sheet's subtle weathered-patina look rather than flat clean metal
-    scatter_patches(parts, mats, "MOSS", "TorsoMossR", center=(0.55, 2.55, 0.40),
-                     spread=(0.35, 0.55), count=8, size_range=(0.035, 0.07), seed=11)
-    scatter_patches(parts, mats, "MOSS", "TorsoMossL", center=(-0.45, 2.70, 0.40),
-                     spread=(0.25, 0.45), count=4, size_range=(0.03, 0.06), seed=12)
+    # sheet's subtle weathered-patina look rather than flat clean metal.
+    # Spread tightened from the old +-0.35/0.55 so a random patch can't
+    # land out past the tapered waist's now-narrower edge.
+    scatter_patches(parts, mats, "MOSS", "TorsoMossR", center=(0.45, 2.60, 0.40),
+                     spread=(0.20, 0.42), count=8, size_range=(0.035, 0.07), seed=11)
+    scatter_patches(parts, mats, "MOSS", "TorsoMossL", center=(-0.42, 2.72, 0.40),
+                     spread=(0.20, 0.38), count=4, size_range=(0.03, 0.06), seed=12)
 
     return join_parts(parts, "Torso")
 
