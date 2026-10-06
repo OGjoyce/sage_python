@@ -175,6 +175,12 @@ static const char* kVertexSrc =
 // parts are flat-material hard-surface plates, matching the "flat
 // shading, hard-surface" instruction from the spec), lit with a simple
 // two-light Lambert + ambient term.
+// Emissive parts (beacon, eyes, chest lights, the sword's corrupt arcs,
+// the base's fire/electric aura) flicker in real time instead of holding
+// a flat brightness -- two mismatched sine waves (an irregular beat, not
+// a clean pulse) combined with a per-submesh phase offset so every glow
+// on the model crackles out of sync with the others rather than in
+// lockstep.
 static const char* kFragSrc =
     "#version 330 core\n"
     "in vec3 vNormal;\n"
@@ -183,13 +189,17 @@ static const char* kFragSrc =
     "uniform vec3 uEmission;\n"
     "uniform vec3 uLightDir1;\n"
     "uniform vec3 uLightDir2;\n"
+    "uniform float uTime;\n"
+    "uniform float uFlickerSeed;\n"
     "void main() {\n"
     "    vec3 n = normalize(vNormal);\n"
     "    float l1 = max(dot(n, uLightDir1), 0.0);\n"
     "    float l2 = max(dot(n, uLightDir2), 0.0) * 0.4;\n"
     "    float ambient = 0.38;\n"
     "    vec3 lit = uBaseColor * (ambient + (1.0 - ambient) * (l1 + l2));\n"
-    "    FragColor = vec4(lit + uEmission, 1.0);\n"
+    "    float ph = uFlickerSeed * 6.2831853;\n"
+    "    float flicker = 0.78 + 0.34 * sin(uTime * 7.3 + ph) * sin(uTime * 2.6 + ph * 1.7);\n"
+    "    FragColor = vec4(lit + uEmission * flicker, 1.0);\n"
     "}\n";
 
 static const char* kPresentVertSrc =
@@ -317,6 +327,8 @@ int main(int argc, char** argv) {
     GLint uEmission = glGetUniformLocation(meshProg, "uEmission");
     GLint uLightDir1 = glGetUniformLocation(meshProg, "uLightDir1");
     GLint uLightDir2 = glGetUniformLocation(meshProg, "uLightDir2");
+    GLint uTime = glGetUniformLocation(meshProg, "uTime");
+    GLint uFlickerSeed = glGetUniformLocation(meshProg, "uFlickerSeed");
 
     GLuint pvs = compileShader(GL_VERTEX_SHADER, kPresentVertSrc);
     GLuint pfs = compileShader(GL_FRAGMENT_SHADER, kPresentFragSrc);
@@ -428,11 +440,17 @@ int main(int argc, char** argv) {
         glUniformMatrix4fv(uMVP, 1, GL_FALSE, vp.m);
         glUniform3f(uLightDir1, -0.45f, 0.70f, 0.55f);
         glUniform3f(uLightDir2, 0.6f, 0.3f, -0.4f);
+        glUniform1f(uTime, (float)glfwGetTime());
         glBindVertexArray(vao);
-        for (auto& sm : mesh.submeshes) {
+        for (size_t smi = 0; smi < mesh.submeshes.size(); smi++) {
+            auto& sm = mesh.submeshes[smi];
             const GLMaterial& mat = mesh.materials[sm.materialIndex];
             glUniform3f(uBaseColor, mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]);
             glUniform3f(uEmission, mat.emission[0], mat.emission[1], mat.emission[2]);
+            // a cheap deterministic per-submesh hash in [0,1) so every
+            // glowing part flickers on its own, out-of-sync phase
+            float seed = fmodf((float)smi * 0.6180339887f, 1.0f);
+            glUniform1f(uFlickerSeed, seed);
             glDrawElements(GL_TRIANGLES, sm.indexCount, GL_UNSIGNED_INT,
                             (void*)(uintptr_t)(sm.indexOffset * sizeof(uint32_t)));
         }

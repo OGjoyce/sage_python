@@ -53,6 +53,19 @@ def add_cylinder(name, radius, depth, location, rotation=(0.0, 0.0, 0.0), vertic
     return obj
 
 
+def add_cone(name, radius1, radius2, depth, location, rotation=(0.0, 0.0, 0.0), vertices=6):
+    """A low-sided cone (or frustum, with radius2 > 0) -- used for the
+    jagged flame licks in the hover base's fire aura."""
+    bpy.ops.mesh.primitive_cone_add(
+        radius1=radius1, radius2=radius2, depth=depth, vertices=vertices, location=location
+    )
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.rotation_euler = rotation
+    obj.modifiers.new("Triangulate", "TRIANGULATE")
+    return obj
+
+
 def add_ring(name, outer_r, inner_r, depth, location, vertices=12):
     """A disc with a hole -- used for the hover base's rings. Built as a
     boolean (outer cylinder minus inner cylinder) rather than hand-modeled,
@@ -255,6 +268,20 @@ def build_undead_ai_materials(cs_materials):
         emission_color=_hex(0xE81855), emission_strength=14.0,
     )
 
+    # MAT_FIRE: the hover base's thruster-flame licks -- a hot orange,
+    # paired with green electric arcs underneath for the "electricity and
+    # fire at once" base aura.
+    mats["FIRE"], _ = cs_materials.new_principled_material(
+        "MAT_FIRE", base_color=_hex(0xFF6A1A), roughness=0.2,
+        emission_color=_hex(0xFF7A20), emission_strength=11.0,
+    )
+    # MAT_GRIME: a sickly, matte near-black buildup for the nastier dead-arm
+    # cables -- corrosion lumps and kinks, distinct from RUST's orange-brown
+    # oxidation and DARK_METAL's clean structural tone.
+    mats["GRIME"], _ = cs_materials.new_principled_material(
+        "MAT_GRIME", base_color=_hex(0x241C14), roughness=1.0, metallic=0.0,
+    )
+
     return mats
 
 
@@ -319,7 +346,50 @@ def build_hover_base(mats):
     assign_material(glow_core, mats["LIVE_GREEN"])
     parts.append(glow_core)
 
+    _build_base_aura(parts, mats)
+
     return join_parts(parts, "HoverBase")
+
+
+def _build_base_aura(parts, mats):
+    """An ambient aura beneath the hover base: fire licks and crackling
+    green electric arcs at once, radiating out from the glow rim -- low-
+    poly cones (not smooth teardrops) for the flames to match the rest of
+    the character's hard-edged language, and the same jagged-cable arc
+    technique as the sword's corrupt aura, just green instead of crimson
+    so it reads as the base's own "alive" energy rather than the sword's
+    corruption bleeding down."""
+    rng = random.Random(33)
+    for i in range(8):
+        ang = (i / 8) * 2 * math.pi + rng.uniform(-0.15, 0.15)
+        r = rng.uniform(0.30, 0.42)
+        h = rng.uniform(0.22, 0.42)
+        base_r = rng.uniform(0.05, 0.085)
+        tilt = rng.uniform(12, 28)
+        loc = (r * math.sin(ang), -0.22 - h * 0.35, r * math.cos(ang))
+        flame = add_cone(f"FireLick_{i}", base_r, 0.008, h, loc,
+                          rotation=(math.radians(90 + tilt), 0, ang), vertices=5)
+        assign_material(flame, mats["FIRE"])
+        parts.append(flame)
+
+    for i in range(6):
+        ang0 = rng.uniform(0, 2 * math.pi)
+        ang1 = ang0 + rng.uniform(1.0, 2.4) * rng.choice((-1, 1))
+        y0 = rng.uniform(-0.35, -0.10)
+        y1 = y0 + rng.uniform(-0.15, 0.15)
+        r0 = rng.uniform(0.34, 0.48)
+        r1 = rng.uniform(0.34, 0.48)
+        rmid = rng.uniform(0.40, 0.55)
+        angmid = (ang0 + ang1) / 2.0 + rng.uniform(-0.5, 0.5)
+        ymid = (y0 + y1) / 2.0 + rng.uniform(-0.08, 0.08)
+        points = [
+            (r0 * math.sin(ang0), y0, r0 * math.cos(ang0)),
+            (rmid * math.sin(angmid), ymid, rmid * math.cos(angmid)),
+            (r1 * math.sin(ang1), y1, r1 * math.cos(ang1)),
+        ]
+        arc = add_cable(f"BaseArc_{i}", points, radius=0.014, bevel_resolution=0)
+        assign_material(arc, mats["LIVE_GREEN"])
+        parts.append(arc)
 
 
 def build_vertebra_stack(mats, name, count, start_y, spacing, radius, height, sides=8):
@@ -395,6 +465,33 @@ def build_torso(mats):
     collar = add_box("TorsoCollar", (1.20, 0.16, 0.78), (0, 3.62, 0.0), bevel_width=0.03, bevel_segments=2)
     assign_material(collar, mats["LIGHT_METAL"])
     parts.append(collar)
+
+    # a faceted octagonal "shoulder yoke" chamfering the torso's top down
+    # toward the neck -- the parts-reference sheet shows the torso's top
+    # as a distinct angled, faceted roof rather than the flat rectangular
+    # top TorsoMain's own bevel alone produces (a single Bevel modifier
+    # chamfers every edge equally, it can't selectively steepen just the
+    # top corners), so this is a separate tapered octagonal cap sitting
+    # right above the collar.
+    yoke = add_cone("TorsoShoulderYoke", 0.90, 0.62, 0.16, (0, 3.70, 0),
+                     rotation=(math.radians(90), 0, 0), vertices=8)
+    assign_material(yoke, mats["METAL"])
+    parts.append(yoke)
+
+    # a narrower, recessed waist panel across the lower torso -- the single
+    # flat TorsoMain slab read as a plain monolithic block next to the
+    # reference sheet's more segmented, tapered silhouette. This breaks the
+    # torso into a visibly wider chest / narrower waist without having to
+    # re-anchor every existing chest/vent/rivet position against a real
+    # split.
+    waist = add_box("TorsoWaist", (1.46, 0.72, 0.70), (0, 2.05, -0.01), bevel_width=0.05, bevel_segments=2)
+    assign_material(waist, mats["DARK_METAL"])
+    parts.append(waist)
+    for dx in (-0.70, -0.23, 0.23, 0.70):
+        seam_rivet = add_cylinder(f"WaistSeamRivet_{dx:.2f}", 0.03, 0.045, (dx, 2.41, 0.40),
+                                   rotation=(math.radians(90), 0, 0), vertices=6)
+        assign_material(seam_rivet, mats["LIGHT_METAL"])
+        parts.append(seam_rivet)
 
     # asymmetric damage per the blueprint: left side clean, right side
     # corroded -- the rusty material carries that asymmetry
@@ -537,7 +634,9 @@ def _build_arm(mats, side, alive):
     base_x = sign * 1.04
     metal_mat = mats["LIGHT_METAL"] if alive else mats["RUST"]
 
-    shoulder = add_box(f"{side}Shoulder", (0.42, 0.44, 0.46), (base_x, 3.35, 0), bevel_width=0.04, bevel_segments=2)
+    # slightly bulkier than the first pass across both arms -- the original
+    # plates read as thin rods next to the torso's own mass
+    shoulder = add_box(f"{side}Shoulder", (0.46, 0.46, 0.50), (base_x, 3.35, 0), bevel_width=0.04, bevel_segments=2)
     assign_material(shoulder, metal_mat)
     parts.append(shoulder)
 
@@ -546,39 +645,46 @@ def _build_arm(mats, side, alive):
         # wrapped around every pivot (shoulder/elbow/wrist), reading as a
         # powered, functioning joint at each break in the armor
         _add_joint_ring(parts, mats, f"{side}ShoulderRing", "LIVE_GREEN",
-                         (base_x * 1.05, 3.10, 0), outer_r=0.19, inner_r=0.145)
+                         (base_x * 1.05, 3.10, 0), outer_r=0.21, inner_r=0.16)
 
-        upper = add_box(f"{side}UpperArm", (0.32, 0.56, 0.32), (base_x * 1.16, 2.90, 0), bevel_width=0.035, bevel_segments=2)
+        # cylindrical limb segments (not boxes) -- the parts-reference
+        # sheet's own "LEFT ARM" isolate shows a rounded tube limb with
+        # ball-ish joints, not rectangular plates; a vertical-axis
+        # cylinder (same rotation convention as the hover base/joint
+        # rings) reads much closer to that than a box ever will
+        upper = add_cylinder(f"{side}UpperArm", 0.195, 0.56, (base_x * 1.16, 2.90, 0),
+                              rotation=(math.radians(90), 0, 0), vertices=10)
         assign_material(upper, metal_mat)
         parts.append(upper)
 
-        elbow = add_cylinder(f"{side}Elbow", 0.12, 0.22, (base_x * 1.16, 2.58, 0),
-                              rotation=(math.radians(90), 0, 0), vertices=8)
+        elbow = add_cylinder(f"{side}Elbow", 0.14, 0.22, (base_x * 1.16, 2.58, 0),
+                              rotation=(math.radians(90), 0, 0), vertices=10)
         assign_material(elbow, mats["DARK_METAL"])
         parts.append(elbow)
         _add_joint_ring(parts, mats, f"{side}ElbowRing", "LIVE_GREEN",
-                         (base_x * 1.16, 2.58, 0), outer_r=0.165, inner_r=0.125)
+                         (base_x * 1.16, 2.58, 0), outer_r=0.185, inner_r=0.14)
 
-        forearm = add_box(f"{side}Forearm", (0.30, 0.58, 0.30), (base_x * 1.16, 2.22, 0), bevel_width=0.03, bevel_segments=2)
+        forearm = add_cylinder(f"{side}Forearm", 0.185, 0.58, (base_x * 1.16, 2.22, 0),
+                                rotation=(math.radians(90), 0, 0), vertices=10)
         assign_material(forearm, metal_mat)
         parts.append(forearm)
 
         _add_joint_ring(parts, mats, f"{side}WristRing", "DARK_GREEN",
-                         (base_x * 1.16, 1.95, 0), outer_r=0.145, inner_r=0.105, depth=0.035, vertices=8)
+                         (base_x * 1.16, 1.95, 0), outer_r=0.165, inner_r=0.12, depth=0.035, vertices=8)
 
-        hand = add_box(f"{side}HandPalm", (0.30, 0.30, 0.22), (base_x * 1.16, 1.76, 0), bevel_width=0.03, bevel_segments=2)
+        hand = add_box(f"{side}HandPalm", (0.34, 0.32, 0.26), (base_x * 1.16, 1.76, 0), bevel_width=0.03, bevel_segments=2)
         assign_material(hand, metal_mat)
         parts.append(hand)
-        palm_light = add_box(f"{side}PalmLight", (0.08, 0.08, 0.02), (base_x * 1.16, 1.76, 0.12))
+        palm_light = add_box(f"{side}PalmLight", (0.08, 0.08, 0.02), (base_x * 1.16, 1.76, 0.14))
         assign_material(palm_light, mats["LIVE_GREEN"])
         parts.append(palm_light)
         # three fingers plus an opposed thumb -- a gripper claw read
         # rather than a flat mitt
-        for i, fx in enumerate((-0.11, 0.0, 0.11)):
-            finger = add_box(f"{side}Finger{i}", (0.085, 0.27, 0.085), (base_x * 1.16 + fx, 1.49, 0))
+        for i, fx in enumerate((-0.12, 0.0, 0.12)):
+            finger = add_box(f"{side}Finger{i}", (0.095, 0.27, 0.095), (base_x * 1.16 + fx, 1.49, 0))
             assign_material(finger, metal_mat)
             parts.append(finger)
-        thumb = add_box(f"{side}Thumb", (0.09, 0.19, 0.09), (base_x * 1.16 - sign * 0.145, 1.62, 0.10),
+        thumb = add_box(f"{side}Thumb", (0.10, 0.19, 0.10), (base_x * 1.16 - sign * 0.16, 1.62, 0.11),
                          rotation=(0, 0, sign * math.radians(35)))
         assign_material(thumb, metal_mat)
         parts.append(thumb)
@@ -588,11 +694,11 @@ def _build_arm(mats, side, alive):
         # offset rust-plate armor left covering it, trailing cables the
         # entire way down (not just at the shoulder) ending in a longer,
         # spindlier claw than the alive hand
-        spine = add_cylinder(f"{side}ArmSpine", 0.095, 1.55, (base_x * 1.14, 2.45, -0.02), vertices=6)
+        spine = add_cylinder(f"{side}ArmSpine", 0.11, 1.55, (base_x * 1.14, 2.45, -0.02), vertices=6)
         assign_material(spine, mats["DARK_METAL"])
         parts.append(spine)
 
-        upper_plate = add_box(f"{side}UpperArmPlate", (0.24, 0.32, 0.24), (base_x * 1.18, 2.95, 0.03),
+        upper_plate = add_box(f"{side}UpperArmPlate", (0.27, 0.33, 0.27), (base_x * 1.18, 2.95, 0.03),
                                bevel_width=0.025, bevel_segments=1)
         assign_material(upper_plate, mats["RUST"])
         parts.append(upper_plate)
@@ -610,7 +716,7 @@ def _build_arm(mats, side, alive):
         assign_material(spark, mats["BEACON"])
         parts.append(spark)
 
-        forearm_plate = add_box(f"{side}ForearmPlate", (0.24, 0.26, 0.24), (base_x * 1.16, 2.30, -0.05),
+        forearm_plate = add_box(f"{side}ForearmPlate", (0.27, 0.26, 0.27), (base_x * 1.16, 2.30, -0.05),
                                  bevel_width=0.02, bevel_segments=1)
         assign_material(forearm_plate, mats["RUST"])
         parts.append(forearm_plate)
@@ -624,29 +730,61 @@ def _build_arm(mats, side, alive):
             assign_material(finger, mats["DARK_METAL"])
             parts.append(finger)
 
-        # cables trail the full length of the arm -- a "dreadlock" bundle
-        # from the shoulder, plus a second cluster off the elbow, rather
-        # than one batch all starting from the same anchor
-        for i in range(5):
-            y0 = 3.05 - i * 0.22
+        # cables trail the full length of the arm -- a thicker, more
+        # tangled "dreadlock" bundle from the shoulder, a second cluster
+        # off the elbow, and now a 4-point kinked path instead of a clean
+        # 3-point sweep, plus corrosion lumps and a couple of oozing
+        # corrupted-color drips where the infection from the sword's aura
+        # reads as spreading into the arm itself
+        rng = random.Random(44 if side == "Right" else 45)
+        cable_mats = (mats["DARK_METAL"], mats["RUST"], mats["GRIME"])
+
+        def _beads(prefix, pts, mat):
+            # a bulge at every interior kink -- a beaded/sausage-link
+            # chain read (per the parts-reference sheet's "CABLE" isolate)
+            # instead of a smooth uniform tube
+            for bi, p in enumerate(pts[1:-1]):
+                bead = add_box(f"{prefix}_Bead{bi}", (0.05, 0.055, 0.05), p,
+                                rotation=(0, 0, rng.uniform(0, math.pi)))
+                assign_material(bead, mat)
+                parts.append(bead)
+
+        for i in range(7):
+            y0 = 3.08 - i * 0.19
+            kink_x = base_x * (1.34 + 0.10 * rng.uniform(-1, 1))
+            kink_z = -0.14 - 0.10 * rng.uniform(0, 1)
+            kink2 = (base_x * 1.38 + 0.06 * (i % 2), y0 - 0.26, -0.20 - 0.04 * (i % 3))
             points = [
                 (base_x * 1.28, y0, -0.10),
-                (base_x * 1.40 + 0.05 * (i % 2), y0 - 0.22, -0.17 - 0.03 * (i % 3)),
-                (base_x * 1.22, y0 - 0.46, -0.08),
+                (kink_x, y0 - 0.14, kink_z),
+                kink2,
+                (base_x * 1.20, y0 - 0.42, -0.07),
             ]
-            cable = add_cable(f"{side}ShoulderCable{i}", points, radius=0.014)
-            assign_material(cable, mats["DARK_METAL"] if i % 2 == 0 else mats["RUST"])
+            cable = add_cable(f"{side}ShoulderCable{i}", points, radius=0.015 + 0.004 * (i % 2))
+            assign_material(cable, cable_mats[i % 3])
             parts.append(cable)
-        for i in range(3):
-            y0 = 2.45 - i * 0.30
+            _beads(f"{side}ShoulderCable{i}", points, mats["GRIME"] if i % 2 == 0 else mats["RUST"])
+
+        for i in range(4):
+            y0 = 2.48 - i * 0.24
+            kink_x = base_x * (1.28 + 0.08 * rng.uniform(-1, 1))
             points = [
                 (base_x * 1.22, y0, -0.08),
-                (base_x * 1.32, y0 - 0.20, -0.13),
-                (base_x * 1.16, y0 - 0.42, -0.05),
+                (kink_x, y0 - 0.12, -0.16),
+                (base_x * 1.34, y0 - 0.24, -0.11),
+                (base_x * 1.14, y0 - 0.38, -0.04),
             ]
-            cable = add_cable(f"{side}ElbowCable{i}", points, radius=0.012)
-            assign_material(cable, mats["RUST"])
+            cable = add_cable(f"{side}ElbowCable{i}", points, radius=0.013)
+            assign_material(cable, mats["RUST"] if i % 2 == 0 else mats["GRIME"])
             parts.append(cable)
+            _beads(f"{side}ElbowCable{i}", points, mats["DARK_METAL"])
+
+        # two small corrupted-color ooze accents -- a hint that whatever
+        # is on the sword isn't staying on the sword
+        for i, (y0, zz) in enumerate(((2.75, -0.16), (2.05, -0.10))):
+            ooze = add_box(f"{side}CorruptOoze{i}", (0.035, 0.07, 0.035), (base_x * 1.30, y0, zz))
+            assign_material(ooze, mats["CORRUPT"])
+            parts.append(ooze)
 
     return join_parts(parts, f"{side}Arm")
 
@@ -829,11 +967,18 @@ def build_undead_ai(cs_materials, root_location=(0.0, 0.0, 0.0), name="UndeadAI"
     right_arm = _build_arm(mats, "Right", alive=False)
 
     sword = build_sword(mats)
-    # mount on the back: rotated to the blueprint's ~25 degree diagonal,
-    # positioned behind the torso (negative Z), tip extending above the
-    # shoulder and the lower blade below the torso
-    sword.rotation_euler = (0, 0, math.radians(-25))
-    sword.location = (0.35, 2.70, -0.60)
+    # mount on the back, hilt up near the shoulder / blade down past the
+    # hip. A naive 180-degree flip of the old -25 degree mount (-> 155)
+    # kept the same shallow, near-vertical lean -- which worked for the
+    # old tip-up version (open background above the head to swing into)
+    # but not this one: the blade now swings DOWN through the torso's own
+    # footprint instead of past it, so most of its length sat hidden
+    # directly behind the torso mesh. Steepened to a much shallower lean
+    # off vertical (closer to horizontal) so the blade clears the torso's
+    # side edge quickly and reads beside the body instead of behind it,
+    # the same way the hilt now clears the shoulder on the way up.
+    sword.rotation_euler = (0, 0, math.radians(118))
+    sword.location = (0.45, 2.85, -0.55)
 
     strap_top = add_box("StrapTop", (0.10, 0.60, 0.04), (0.35, 3.30, -0.50), rotation=(0, 0, math.radians(-15)))
     assign_material(strap_top, mats["CLOTH"])
