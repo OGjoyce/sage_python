@@ -54,6 +54,30 @@ def _set_origin(obj, world_point):
     cursor.location = old
 
 
+def _normalize_rotation(obj):
+    """Bakes any existing object-level rotation into the mesh data and
+    resets rotation_euler to identity, keeping the exact same world
+    appearance.
+
+    characters.py's join_parts() keeps parts[0]'s own object-level
+    rotation on the combined object (joining copies the OTHER parts'
+    geometry into parts[0]'s mesh, accounting for their relative
+    rotation, but never touches parts[0]'s own transform) -- and
+    HoverBase's first part is a tier built with rotation=(90, 0, 0), so
+    HoverBase's rotation_euler is secretly (90, 0, 0) at "rest", not
+    (0, 0, 0). Every animation in this module assumes rotation_euler=0
+    means the rest pose; keyframing a pose like (0, 0, tilt_deg) would
+    silently replace that load-bearing 90-degree rotation instead of
+    adding to it, scrambling the whole part's orientation the moment it
+    got its first keyframe. Run for all five pivoted parts, defensively,
+    not just HoverBase -- any future change to which part ends up first
+    in a join_parts() call could introduce the same trap elsewhere."""
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+
+
 def _parent_keep_transform(child, parent):
     bpy.ops.object.select_all(action="DESELECT")
     child.select_set(True)
@@ -92,6 +116,9 @@ def build_character_rig(parts):
     _set_origin(head, HEAD_PIVOT)
     _set_origin(left_arm, LEFT_SHOULDER_PIVOT)
     _set_origin(right_arm, RIGHT_SHOULDER_PIVOT)
+
+    for obj in (hover, torso, head, left_arm, right_arm):
+        _normalize_rotation(obj)
 
     _parent_keep_transform(parts["LowerSpine"], hover)
     _parent_keep_transform(torso, hover)
