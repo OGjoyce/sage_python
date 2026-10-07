@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+
+# generated output -- regenerate on demand, not checked in
+renders/
+exports/
+requests/

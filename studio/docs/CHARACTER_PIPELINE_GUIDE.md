@@ -152,6 +152,45 @@ here, repeatedly:
    that question is too diffuse to act on.
 4. Fix exactly the mismatch found, re-render, repeat.
 
+### 3d. Collecting these inputs through the Poly Forge intake page
+
+Typing a spec by hand every time is optional now. **Poly Forge** is a
+small web form (a Claude Artifact) for submitting exactly the inputs
+3a/3b describe -- a reference image, a free-text prompt, a color
+palette, a triangle budget, and toggles for whether the model needs its
+own scene/lighting and which output formats it needs -- without opening
+an editor. Each submission is stored in the page's own queue (readable
+by whoever has the link, backed by the Artifact `db`/`assets`
+capabilities), not as files in this repo.
+
+Turning a submission into actual files an agent can run is a separate,
+deliberate step: read the queue with the `ArtifactData` tool (`action:
+"list"`, `collection: "requests"`) against the page's URL, download the
+reference image (if any) from its `imageAssetId` via the `Artifact`
+tool's `read` action with that id as `path`, write the spec to a local
+JSON file, and run:
+
+```sh
+python3 studio/tools/request_scaffold.py path/to/spec.json \
+    [--image path/to/reference.<ext>] --out studio
+```
+
+This needs no `bpy` -- it's plain Python -- and writes:
+
+- `studio/requests/<slug>/spec.json` and `.../reference.<ext>` (gitignored; regenerate on demand)
+- `studio/scenes/<slug>_scene.py` -- a runnable starting-point scene
+  script, pre-wired to the submission's triangle budget, one material
+  per chosen color, scene/light toggles, and export calls for every
+  output format requested (OBJ+MTL, `.uaig`, a rendered PNG still, and a
+  turntable-animation comment block). If a reference image was
+  submitted it drives `image_to_3d.image_to_mesh()` for an immediate
+  relief mesh; otherwise it leaves a `parts = {}` block marked `TODO`
+  for hand-built primitives, per sections 3a-4.
+
+Run the scaffolded script (`blender -b --python studio/scenes/<slug>_scene.py`),
+then keep iterating on it exactly as section 3c describes -- the
+scaffold is a starting point, not a finished model.
+
 ---
 
 ## 4. Building the model
