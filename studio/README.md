@@ -13,6 +13,14 @@ this container — `bpy` scripts run via `blender -b`, no display needed
    `waterfall/shared/water_core_3d.glsl`'s raymarched version), and a
    generic image→3D-relief pipeline with a triangle-count budget.
 
+**Building or animating a low-poly character?** See
+[`docs/CHARACTER_PIPELINE_GUIDE.md`](docs/CHARACTER_PIPELINE_GUIDE.md) --
+what reference images/spec to start from, the primitive/material/export
+API, the rigid-body animation rig in `claude_studio/rig.py`, and (in its
+Pitfalls section) every real bug hit building the one character this
+pipeline has shipped so far, written down so the next character doesn't
+re-discover them.
+
 ```
 studio/
   claude_studio/
