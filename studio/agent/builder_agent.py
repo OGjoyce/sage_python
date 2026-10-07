@@ -4,6 +4,7 @@ through real Blender, read back what happened, repeat. Three tools only
 is exactly "one scene script, run through Blender," never an open shell.
 """
 
+import base64
 import json
 import os
 
@@ -63,6 +64,37 @@ TOOLS = [
         },
     },
 ]
+
+
+def _image_feedback_message(paths):
+    """A follow-up user turn carrying the actual rendered PNG(s) from the
+    last run_blender call, so the model can see what it built instead of
+    only reading stdout. Capped at 2 images to keep context bounded."""
+    content = [{
+        "type": "text",
+        "text": (
+            "This is the actual rendered output from that run. Look at it "
+            "critically against the request: is the silhouette right, are "
+            "the colors/materials visibly correct (not just assigned in "
+            "code), is anything meant to be visible (a face, a feature) "
+            "actually facing the camera and not hidden on the far side or "
+            "occluded by another part? If something is wrong, fix it in "
+            "the script and run again -- don't call finish() on a render "
+            "that doesn't match the request just because it ran without "
+            "an error."
+        ),
+    }]
+    for path in paths[:2]:
+        try:
+            with open(os.path.join(config.STUDIO_ROOT, path), "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+        except OSError:
+            continue
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{b64}"},
+        })
+    return {"role": "user", "content": content}
 
 
 def _build_initial_messages(session):
@@ -170,6 +202,8 @@ def run_session(session, max_iterations=None, on_event=None):
                 "tool_call_id": tool_call.id,
                 "content": json.dumps(result)[:8000],
             })
+            if name == "run_blender" and result.get("render_paths"):
+                messages.append(_image_feedback_message(result["render_paths"]))
             if name == "finish":
                 finished = True
                 success = bool(args.get("success"))

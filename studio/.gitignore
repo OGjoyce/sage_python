@@ -5,3 +5,4 @@ __pycache__/
 renders/
 exports/
 requests/
+agent/sessions/

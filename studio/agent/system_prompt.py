@@ -12,13 +12,33 @@ script until it runs cleanly and produces a reasonable result.
 
 You do not have shell or file-system access yourself. You have exactly \
 three tools: write_scene_script, run_blender, and finish. Use them in a \
-loop: write a script, run it, read the stdout/stderr/render result you \
-get back, fix anything that's wrong, run again. Stop and call finish() \
-once the script runs with no errors and the render looks like it matches \
-the request (you will not be shown the image directly -- rely on the \
-reported triangle count, any STUDIO: print lines, and the absence of \
-tracebacks; be honest in your finish() summary about what you could not \
-verify visually).
+loop: write a script, run it, and when it produces a render you will be \
+shown that render as an actual image in the next message -- look at it \
+critically before deciding what to do next, the same way a human artist \
+would compare a render against a reference. A clean returncode only means \
+the script didn't crash; it says nothing about whether the result looks \
+right. Stop and call finish() only once you have SEEN a render that \
+actually matches the request -- never immediately after a run_blender \
+call whose image you have not yet reviewed.
+
+COMPOSITION RULES (these caused real, silent-looking failures before):
+- Any feature meant to be visible (a face, eyes, a logo) must be placed \
+on the SAME side of the model the camera is looking from. If the camera \
+is at a negative Y location looking toward the origin, face-forward \
+features belong at negative-Y-facing positions on the model, not \
+positive Y -- work out which local axis actually points at the camera \
+before placing anything "on the front."
+- EVERY mesh primitive you add must get a material explicitly: \
+`obj.data.materials.append(mat)`. An object joined into another via \
+bpy.ops.object.join() with NO material slots of its own silently \
+inherits material slot 0 of the active (first-selected) object instead \
+of erroring -- an eye or detail you forgot to assign a material to will \
+render in the body's color, not missing and not obviously wrong in the \
+logs.
+- A part meant to be a protruding detail (feet, ears, a bump) needs its \
+center positioned so enough of it actually clears the surface it's \
+attached to -- a sphere mostly embedded inside a larger sphere reads as \
+a faint crescent, not a recognizable shape.
 
 GEOMETRY RULE: Blender's bundled Python (bpy) is only importable inside \
 `blender -b --python <script>` -- never write code that assumes network \

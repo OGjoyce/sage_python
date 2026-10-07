@@ -1,177 +1,102 @@
-"""
-kirby_scene.py — a "greybox" test object: a simple round character (body,
-two feet, two arms, two eye-bumps), built entirely from icosphere
-primitives (triangles by construction -- an icosphere is subdivided
-triangles all the way, unlike a UV sphere's quads+poles) and a single flat
-gray material, no color/texture detail at all. This is deliberately a
-geometry/topology test, not a finished character: one uniform gray
-material everywhere is a classic game-dev "greybox" prototyping move, used
-specifically to judge shape and proportion without material work
-distracting from it.
-
-Placed standing on the tallest boulder in the waterfall scene (reusing
-waterfall_scene's builders) so the two studio demos share one render.
-
-Run with:
-    blender -b --python studio/scenes/kirby_scene.py
-    -> studio/renders/kirby_scene.png
-"""
-
+import bpy
 import os
 import sys
+from math import radians
+import bmesh
+import mathutils
 
-STUDIO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, STUDIO_DIR)
-sys.path.insert(0, os.path.join(STUDIO_DIR, "scenes"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import claude_studio as cs
 
-import bpy  # noqa: E402
-import claude_studio as cs  # noqa: E402
-import waterfall_scene as wf  # noqa: E402
+# Reset the scene
+cs.scene.reset_scene()
 
-RENDERS_DIR = os.path.join(STUDIO_DIR, "renders")
+# Parameters
+colors = {
+    "pink": (0.9686, 0.6863, 0.7686, 1),  # #F7AFC4
+    "red": (0.8784, 0.2824, 0.3529, 1),  # #E0485A
+    "blue": (0.1804, 0.1922, 0.5725, 1),  # #2E3192
+    "blush": (0.9569, 0.6039, 0.7569, 1)  # #F49AC1
+}
 
+# Create materials
+pink_material, _ = cs.materials.new_principled_material(name="Pink", base_color=colors["pink"], roughness=0.7)
+red_material, _ = cs.materials.new_principled_material(name="RedFeet", base_color=colors["red"], roughness=0.7)
+blue_material, _ = cs.materials.new_principled_material(name="BlueEyes", base_color=colors["blue"], roughness=0.7)
+blush_material, _ = cs.materials.new_principled_material(name="Blush", base_color=colors["blush"], roughness=0.7)
 
-def add_tri_icosphere(name, radius, location, scale=(1.0, 1.0, 1.0), subdivisions=3):
-    """An icosphere -- not a UV sphere -- specifically because its surface
-    is 100% triangles by construction (20 * 4^subdivisions of them, no
-    quads, no poles). Adding a Triangulate modifier on top is redundant
-    here but kept anyway so the intent ("this part is triangles, provably,
-    not just incidentally") is explicit in the modifier stack, not just
-    true by choice of primitive."""
-    bpy.ops.mesh.primitive_ico_sphere_add(radius=radius, subdivisions=subdivisions, location=location)
-    obj = bpy.context.active_object
-    obj.name = name
-    obj.scale = scale
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    obj.modifiers.new("Triangulate", "TRIANGULATE")
-    return obj
+# Add Kirby's body
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=(0, 0, 1))
+body = bpy.context.object
+body.name = "KirbyBody"
+body.data.materials.append(pink_material)
 
+# Add Kirby's feet
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.4, location=(-0.5, -0.6, 0.4))
+left_foot = bpy.context.object
+left_foot.name = "LeftFoot"
+left_foot.data.materials.append(red_material)
 
-def build_kirby(base_location=(0.0, 0.0, 0.0), body_radius=0.42, name="KirbyClone"):
-    """All parts positioned relative to `base_location`, which is where
-    the feet touch the ground. Returns the single joined mesh object.
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.4, location=(0.5, -0.6, 0.4))
+right_foot = bpy.context.object
+right_foot.name = "RightFoot"
+right_foot.data.materials.append(red_material)
 
-    Proportions are worked out so each nub part's center sits roughly ON
-    the body sphere's surface (distance from body center ~= body_radius):
-    that's what makes a small sphere read as "attached to and poking out
-    of" the big one, instead of either floating disconnected (center too
-    far out) or fully swallowed and invisible (center too far in) -- the
-    first version of this had the feet's center so close to the body's
-    own center that they ended up entirely inside it."""
-    bx, by, bz = base_location
-    R = body_radius
-    parts = []
+# Add Kirby's eyes
+bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=0.15, location=(-0.3, -0.95, 1.2))
+left_eye = bpy.context.object
+left_eye.name = "LeftEye"
+left_eye.data.materials.append(blue_material)
 
-    body_z = bz + R * 0.92  # squashed scale.z=0.92, so this puts the bottom exactly at bz
-    body = add_tri_icosphere(
-        f"{name}_Body", R, (bx, by, body_z),
-        scale=(1.0, 0.96, 0.92), subdivisions=3,
-    )
-    parts.append(body)
+bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=0.15, location=(0.3, -0.95, 1.2))
+right_eye = bpy.context.object
+right_eye.name = "RightEye"
+right_eye.data.materials.append(blue_material)
 
-    foot_r = R * 0.32
-    for side, dx in (("L", -0.38), ("R", 0.38)):
-        foot = add_tri_icosphere(
-            f"{name}_Foot{side}", foot_r,
-            (bx + dx * R, by - 0.42 * R, bz + 0.07 * R),
-            scale=(1.0, 1.3, 0.55), subdivisions=2,
-        )
-        parts.append(foot)
+# Add Kirby's blush
+bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=0.1, location=(-0.4, -0.95, 1.05))
+left_blush = bpy.context.object
+left_blush.name = "LeftBlush"
+left_blush.data.materials.append(blush_material)
 
-    arm_r = R * 0.27
-    for side, dx in (("L", -1.0), ("R", 1.0)):
-        arm = add_tri_icosphere(
-            f"{name}_Arm{side}", arm_r,
-            (bx + dx * R, by, body_z),
-            scale=(1.0, 0.9, 1.1), subdivisions=2,
-        )
-        parts.append(arm)
+bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=0.1, location=(0.4, -0.95, 1.05))
+right_blush = bpy.context.object
+right_blush.name = "RightBlush"
+right_blush.data.materials.append(blush_material)
 
-    eye_r = R * 0.11
-    eye_z = body_z + 0.20 * R
-    for side, dx in (("L", -0.30), ("R", 0.30)):
-        eye = add_tri_icosphere(
-            f"{name}_Eye{side}", eye_r,
-            (bx + dx * R, by - 0.95 * R, eye_z),
-            scale=(0.85, 0.5, 1.35), subdivisions=1,
-        )
-        parts.append(eye)
+# Combine all Kirby parts
+bpy.ops.object.select_all(action='DESELECT')
+body.select_set(True)
+left_foot.select_set(True)
+right_foot.select_set(True)
+left_eye.select_set(True)
+right_eye.select_set(True)
+left_blush.select_set(True)
+right_blush.select_set(True)
+bpy.context.view_layer.objects.active = body
+bpy.ops.object.join()
 
-    mat, bsdf = cs.materials.new_principled_material(
-        f"{name}_GrayClay", base_color=(0.62, 0.62, 0.63, 1.0), roughness=0.55, metallic=0.0,
-    )
-    cs.materials.add_noise_bump(mat, bsdf, scale=22.0, strength=0.04)
-    for p in parts:
-        p.data.materials.append(mat)
+# Add camera and a single sun light
+cs.scene.add_camera(location=(0, -5, 2), target=(0, 0, 1))
+cs.scene.add_sun(location=(5, -5, 10), target=(0, 0, 1), energy=2.0)
 
-    # NOTE: bpy.ops.object.join() merges base mesh *data* from every
-    # selected object into the active one, but drops the non-active
-    # objects' modifiers in the process -- so each part's Triangulate
-    # modifier doesn't survive the join. That's harmless here specifically
-    # because an icosphere's base geometry is already 100% triangles (see
-    # add_tri_icosphere's docstring); the modifier was a belt-and-braces
-    # guarantee, not the thing actually doing the work.
-    bpy.ops.object.select_all(action="DESELECT")
-    for p in parts:
-        p.select_set(True)
-    bpy.context.view_layer.objects.active = body
-    bpy.ops.object.join()
-    body.name = name
-    return body
+# Set the world background to mid-gray
+cs.scene.set_world_gradient(top_color=(0.6, 0.6, 0.6, 1), bottom_color=(0.6, 0.6, 0.6, 1))
 
+# Triangle count evaluation
+# Due to complex operations, directly evaluate triangle count
+mesh = body.data
+depsgraph = bpy.context.evaluated_depsgraph_get()
+evaluated_mesh = body.evaluated_get(depsgraph).to_mesh()
+triangle_count = len(evaluated_mesh.polygons)
+body.evaluated_get(depsgraph).to_mesh_clear()
 
-def main():
-    cs.scene.reset_scene()
+# Export the model
+ROOT = os.path.join(os.path.dirname(__file__), '..')
+os.makedirs(os.path.join(ROOT, 'renders'), exist_ok=True)
+os.makedirs(os.path.join(ROOT, 'exports'), exist_ok=True)
+cs.gl_export.export_obj_mtl({"Kirby": body}, os.path.join(ROOT, 'exports', 'kirby.obj'))
+cs.render.configure_render(filepath=os.path.join(ROOT, 'renders', 'kirby.png'), samples=32, resolution=(960, 540), denoise=False, view_transform="Standard")
+cs.render.render_still()
 
-    wf.build_cliff()
-    wf.build_boulders()
-    wf.build_water()
-    wf.build_waterfall()
-
-    # Stand Kirby on the furthest-downstream boulder (x=2.85, past the
-    # cliff's right edge at x=2.3), not the biggest one at (1.55, 0.65) --
-    # that one sits right against the cliff face, and any shot tight
-    # enough to make a 0.3-unit character legible has the adjacent
-    # 6.6-unit wall looming across the whole frame. Boulder center sits at
-    # z = radius*0.55 (see build_boulders), so its top is roughly
-    # center + radius.
-    boulder_xy = (2.85, 0.95)
-    boulder_r = 0.20
-    boulder_top_z = boulder_r * 0.55 + boulder_r
-    kirby = build_kirby(base_location=(boulder_xy[0], boulder_xy[1], boulder_top_z), body_radius=0.22)
-
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    eval_kirby = kirby.evaluated_get(depsgraph)
-    mesh = eval_kirby.to_mesh()
-    tri_count = len(mesh.polygons)
-    eval_kirby.to_mesh_clear()
-    print(f"STUDIO: {kirby.name} built from {tri_count} triangles")
-
-    wf.build_lighting_and_world()
-    # Framed tight on the boulder Kirby's standing on (not the whole
-    # cliff) -- the first pass used the wide waterfall_scene establishing
-    # shot framing, which made a 0.3-radius character indistinguishable
-    # from a 0.29-radius rock at that distance. The *second* pass then put
-    # the camera itself a little too close and on the wrong side of the
-    # (thin, 0.8-unit) cliff slab, so its view ray grazed through solid
-    # rock instead of around it -- this offset is the same cliff-clearing
-    # (dx, dy, dz) direction waterfall_scene's own working camera uses,
-    # just scaled down for a tighter shot on one boulder instead of the
-    # whole establishing shot.
-    kirby_target = (boulder_xy[0], boulder_xy[1], boulder_top_z + 0.20)
-    cs.scene.add_camera(
-        location=(kirby_target[0] + 2.2, kirby_target[1] - 2.6, kirby_target[2] + 0.9),
-        target=kirby_target,
-        lens=40,
-    )
-
-    cs.render.configure_render(
-        engine="CYCLES", samples=64, resolution=(960, 540), denoise=False,
-        filepath=os.path.join(RENDERS_DIR, "kirby_scene.png"),
-    )
-    cs.render.render_still()
-    print("STUDIO: rendered to", os.path.join(RENDERS_DIR, "kirby_scene.png"))
-
-
-if __name__ == "__main__":
-    main()
+print(f"STUDIO: Kirby model created with {triangle_count} triangles.")
