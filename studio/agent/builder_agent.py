@@ -122,7 +122,7 @@ def run_session(session, max_iterations=None, on_event=None):
     -> result, persisting the conversation after every round so a crashed
     or interrupted run can be resumed with the same session id. Returns
     {finished, success, summary, iterations}."""
-    api_key = config.require_api_key()  # fail with a clear message before even importing the SDK
+    api_key = config.require_api_key()  # proxy-injected auth -- see config.py
     from openai import OpenAI
 
     max_iterations = max_iterations or config.MAX_ITERATIONS
