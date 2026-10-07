@@ -106,6 +106,8 @@ def _dispatch_tool(session, name, args, on_event):
             "stdout_tail": result["stdout"][-4000:],
             "stderr_tail": result["stderr"][-4000:],
             "render_paths": [os.path.relpath(p, config.STUDIO_ROOT) for p in result["render_paths"]],
+            "export_paths": [os.path.relpath(p, config.STUDIO_ROOT) for p in result["export_paths"]],
+            "warning": result["warning"],
         }
 
     if name == "finish":

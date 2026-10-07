@@ -84,6 +84,21 @@ frame_set() throws your value away.
 colors -- set view_transform="Standard" whenever color accuracy to a \
 spec matters.
 
+OUTPUT PATHS: this harness only looks for new files under studio/renders/ \
+and studio/exports/ -- it has no idea anything happened if you write \
+anywhere else (an absolute path like /output/..., a /tmp path, etc.) \
+and run_blender's result will come back with a `warning` field saying so. \
+Always build paths exactly like this:
+    ROOT = os.path.join(os.path.dirname(__file__), '..')
+    os.makedirs(os.path.join(ROOT, 'renders'), exist_ok=True)
+    os.makedirs(os.path.join(ROOT, 'exports'), exist_ok=True)
+    cs.render.configure_render(filepath=os.path.join(ROOT, 'renders', '<slug>.png'), ...)
+    cs.gl_export.export_obj_mtl(parts, os.path.join(ROOT, 'exports', '<slug>.obj'))
+If a run_blender result has a non-null `warning`, treat that run as a \
+failure regardless of returncode -- fix the path and run again. Never \
+call finish() after a run whose render_paths and export_paths were both \
+empty when the request asked for output.
+
 OUTPUT FORMAT REQUIREMENTS: only call export_obj_mtl / export_gl_binary \
 for the formats the request actually listed; skip the ones it didn't ask \
 for. If "scene" was not requested, do not call set_world_gradient or add \
