@@ -187,14 +187,18 @@ def _organic_box(name, dims, loc, mat, rot=(0, 0, 0), levels=2):
 # =============================================================== cloak ====
 
 def _build_cloak(mat_cloth, mat_gold):
-    """Short pale cloak, wind-swept to her left (+X) and billowing back.
+    """Short pale cloak, caught by the wind off her left shoulder.
 
-    Built as a parametric grid (theta around the body x v down the cloth),
-    solidified for thickness and subdivided so it reads as cloth.  The last
-    two V-rows get material slot 1 -> a distinct gold hem band.
+    The cloth FALLS first and is pushed sideways second, so it never reads
+    as a rigid plank: each column keeps a hanging component, the trailing
+    (her left) side is lifted and swept out, the lower corner curls back on
+    itself, the panel tapers toward the hem and the hem itself runs wavy.
+    Grid -> solidify -> subsurf 2 -> smooth, so it shades as cloth, and the
+    bottom row of faces carries material slot 1: the gold hem band.
     """
-    NU, NV = 30, 15
+    NU, NV = 36, 18
     HEM_ROWS = 1
+    TOP_Y = Y_NECK + 0.028
     bm = bmesh.new()
     grid = []
     for iv in range(NV):
@@ -202,20 +206,35 @@ def _build_cloak(mat_cloth, mat_gold):
         row = []
         for iu in range(NU):
             t = iu / (NU - 1.0)
-            theta = math.radians(-142.0 + 284.0 * t)      # 0 = straight behind
-            # base shell around the torso, flaring as it falls
-            r = 0.190 + 0.215 * (v ** 1.2)
-            r += 0.042 * math.sin(4.0 * theta) * (0.25 + v)   # vertical folds
-            y = (Y_NECK + 0.030) - 0.680 * v
+            theta = math.radians(-148.0 + 296.0 * t) * (1.0 - 0.04 * v)
+            w = 0.5 * (1.0 + math.sin(theta))     # 1 on her left (trailing) side
+
+            # --- hang: the dominant motion.  Everything falls; the lifted
+            #     trailing side falls only slightly less.
+            y = TOP_Y - 0.720 * v * (1.0 - 0.10 * w)
+
+            # --- shell + travelling folds (deeper toward the free hem)
+            fold = (0.034 * math.sin(4.1 * theta + 0.8)
+                    + 0.018 * math.sin(7.3 * theta - 1.9)) * (0.20 + 1.05 * v)
+            r = 0.190 + 0.130 * (v ** 1.1) + fold
             x = r * math.sin(theta)
             z = -r * math.cos(theta) - 0.030
-            # wind: sweep toward her left (+X), billow backward, hem curls up
-            lift = 0.5 * (1.0 + math.sin(theta))          # 1 on her left side
-            x += 0.235 * (v ** 1.9) * (0.35 + 0.65 * lift)
-            z -= 0.150 * (v ** 1.8) * (0.4 + 0.6 * lift)
-            y += 0.185 * (v ** 2.4) * lift                # trailing edge flies up
-            y -= 0.035 * (v ** 2.0) * (1.0 - lift)
-            z += 0.070 * (v ** 2.2) * math.cos(2.6 * theta)   # curl
+
+            # --- wind: the whole cloth drifts to her left and back, the
+            #     trailing half much more, growing toward the free end
+            push = v ** 1.5
+            x += (0.065 + 0.210 * w) * push
+            z -= (0.050 + 0.135 * w) * push
+
+            # --- the lower trailing corner rolls over on itself
+            curl = (v ** 2.5) * w
+            z += 0.300 * curl
+            y += 0.150 * curl
+            x -= 0.070 * curl
+
+            # --- wavy, never-straight hem
+            y += 0.080 * math.sin(3.6 * theta + 0.5) * (v ** 2.0)
+            z += 0.055 * math.cos(3.1 * theta - 0.9) * (v ** 2.2)
             row.append(bm.verts.new((x, y, z)))
         grid.append(row)
     for iv in range(NV - 1):
@@ -229,16 +248,62 @@ def _build_cloak(mat_cloth, mat_gold):
     bm.free()
     obj = bpy.data.objects.new("LYS_cloak", mesh)
     bpy.context.collection.objects.link(obj)
-    s = obj.modifiers.new("Solidify", "SOLIDIFY")
-    s.thickness = 0.016
-    s.offset = 0.0
-    s.material_offset = 0
-    s.material_offset_rim = 0
+    sol = obj.modifiers.new("Solidify", "SOLIDIFY")
+    sol.thickness = 0.014
+    sol.offset = 0.0
+    sol.material_offset = 0
+    sol.material_offset_rim = 0
     _subsurf(obj, 2)
     _smooth(obj)
     assign_material(obj, mat_cloth)
     assign_material(obj, mat_gold)
     return obj
+
+
+# ----------------------------------------------------------- head profile
+# One table drives both the head loft and the placement of every face
+# feature, so eyes/brows/mouth sit ON the skull instead of hovering in
+# front of it.  CC_SHRINK is the measured Catmull-Clark limit shrink of an
+# 8-gon ring (verified against the evaluated mesh).
+HEAD_RINGS = (
+    (1.594, 0.044, 0.052), (1.632, 0.064, 0.078), (1.678, 0.076, 0.090),
+    (1.725, 0.082, 0.098), (1.755, 0.084, 0.100), (1.800, 0.082, 0.098),
+    (1.816, 0.074, 0.088), (1.830, 0.052, 0.062),
+)
+CC_SHRINK = 0.902
+
+
+def _head_profile(y):
+    rs = HEAD_RINGS
+    if y <= rs[0][0]:
+        hw, hd = rs[0][1], rs[0][2]
+    elif y >= rs[-1][0]:
+        hw, hd = rs[-1][1], rs[-1][2]
+    else:
+        for i in range(len(rs) - 1):
+            if rs[i][0] <= y <= rs[i + 1][0]:
+                f = (y - rs[i][0]) / (rs[i + 1][0] - rs[i][0])
+                hw = rs[i][1] + (rs[i + 1][1] - rs[i][1]) * f
+                hd = rs[i][2] + (rs[i + 1][2] - rs[i][2]) * f
+                break
+    return hw * CC_SHRINK, hd * CC_SHRINK
+
+
+def _face_point(x, y):
+    """Surface Z and outward yaw on the face at (x, y)."""
+    a, b = _head_profile(y)
+    xr = max(-0.94, min(0.94, x / a))
+    z = b * math.sqrt(1.0 - xr * xr)
+    return z, math.atan2(x / (a * a), z / (b * b))
+
+
+def _face_part(name, x, y, dims, mat, proud=0.001, tilt=0.0, bevel=0.002):
+    """A thin plate laid flat onto the face surface, following its curve."""
+    z, yaw = _face_point(x, y)
+    nx, nz = math.sin(yaw), math.cos(yaw)
+    d = proud - dims[2] * 0.5
+    return _plate(name, dims, (x + nx * d, y, z + nz * d), mat,
+                  rot=(0.0, yaw, tilt), bevel=bevel)
 
 
 # =============================================================== build ====
@@ -251,7 +316,7 @@ def build():
         "LYS_skin_dark", base_color=(0.430, 0.280, 0.190, 1.0), roughness=0.55)
     # quilted under-armour: what shows between the plates (never bare skin)
     M["under"], _ = cs.materials.new_principled_material(
-        "LYS_underarmour", base_color=(0.098, 0.092, 0.105, 1.0), roughness=0.72)
+        "LYS_underarmour", base_color=(0.105, 0.091, 0.082, 1.0), roughness=0.70)
     M["ivory"], _ = cs.materials.new_principled_material(
         "LYS_ivory", base_color=IVORY, roughness=0.34, metallic=0.25)
     M["ivory_dim"], _ = cs.materials.new_principled_material(
@@ -429,6 +494,9 @@ def build():
     assign_material(disc, M["gold"])
     P(disc)
     rim = add_ring("LYS_solar_rim", 0.146, 0.126, 0.040, (DX, DY, DZ + 0.014), vertices=32)
+    leftover = bpy.data.objects.get("LYS_solar_rim_inner")
+    if leftover is not None:
+        bpy.data.objects.remove(leftover, do_unlink=True)
     rim.modifiers.clear()
     _bevel(rim, 0.004, 2)
     rim.modifiers.new("Triangulate", "TRIANGULATE")
@@ -633,39 +701,36 @@ def build():
             [(0.062, 0.060), (0.054, 0.054)], M["skin"]))
     P(_tube(
         "LYS_head",
-        [(0.0, Y_CHIN - 0.006, 0.014), (0.0, 1.632, 0.010), (0.0, 1.678, 0.004),
-         (0.0, Y_EYE - 0.030, 0.0), (0.0, Y_EYE, 0.0), (0.0, Y_BROW + 0.018, -0.002),
-         (0.0, 1.820, -0.008), (0.0, Y_TOP - 0.012, -0.014)],
-        [(0.044, 0.052), (0.064, 0.078), (0.076, 0.090), (0.082, 0.098),
-         (0.084, 0.100), (0.082, 0.098), (0.074, 0.088), (0.052, 0.062)],
+        [(0.0, r[0], 0.0) for r in HEAD_RINGS],
+        [(r[1], r[2]) for r in HEAD_RINGS],
         M["skin"]))
     # jaw / chin definition
-    P(_organic_box("LYS_jaw", (0.112, 0.064, 0.108), (0.0, 1.642, 0.022), M["skin"]))
-    # nose
-    P(_organic_box("LYS_nose", (0.026, 0.058, 0.044), (0.0, F_NOSE + 0.014, 0.078), M["skin"]))
-    # eyes (dark amber, steady) in shallow sockets
+    P(_organic_box("LYS_jaw", (0.110, 0.062, 0.104), (0.0, 1.643, 0.018), M["skin"]))
+    # nose: the one feature that should stand off the surface
+    nz, _ = _face_point(0.0, F_NOSE + 0.014)
+    P(_organic_box("LYS_nose", (0.026, 0.060, 0.050),
+                   (0.0, F_NOSE + 0.014, nz - 0.013), M["skin"]))
+    P(_organic_box("LYS_nose_tip", (0.022, 0.022, 0.030),
+                   (0.0, F_NOSE - 0.008, nz - 0.006), M["skin"], levels=2))
+    # eyes: a dark eye-slot with a steady dark-amber iris, both laid onto
+    # the skull's curve (small, calm, symmetrical -- this face is read at
+    # 5 m, so it must not break into floating parts)
     for side, sx in (("R", -1.0), ("L", 1.0)):
-        P(_plate(f"LYS_socket_{side}", (0.046, 0.019, 0.014),
-                 (sx * 0.040, F_EYE, 0.060), M["skin_dark"], bevel=0.005))
-        eye = add_cylinder(f"LYS_eye_{side}", 0.0105, 0.014,
-                           (sx * 0.040, F_EYE + 0.001, 0.070),
-                           rotation=(math.radians(90), 0, 0), vertices=12)
-        eye.modifiers.clear()
-        assign_material(eye, M["eye"])
-        P(eye)
-        # brow ridge
-        P(_plate(f"LYS_brow_{side}", (0.048, 0.008, 0.014),
-                 (sx * 0.041, F_BROW, 0.068), M["hair"],
-                 rot=(0, 0, -sx * math.radians(8)), bevel=0.002))
-        # upper lash line keeps the eyes from reading as beads
-        P(_plate(f"LYS_lash_{side}", (0.042, 0.006, 0.012),
-                 (sx * 0.040, F_EYE + 0.010, 0.071), M["dark"], bevel=0.002))
+        ex = sx * 0.038
+        P(_face_part(f"LYS_socket_{side}", ex, F_EYE, (0.044, 0.020, 0.010),
+                     M["skin_dark"], proud=-0.0015, bevel=0.003))
+        P(_face_part(f"LYS_eyeslot_{side}", ex, F_EYE, (0.036, 0.013, 0.009),
+                     M["dark"], proud=0.0004, tilt=-sx * math.radians(3)))
+        P(_face_part(f"LYS_eye_{side}", ex, F_EYE - 0.001, (0.017, 0.011, 0.008),
+                     M["eye"], proud=0.0009))
+        P(_face_part(f"LYS_brow_{side}", ex, F_BROW, (0.042, 0.008, 0.009),
+                     M["hair"], proud=0.0012, tilt=-sx * math.radians(9)))
     # mouth: calm, closed, level
-    P(_plate("LYS_mouth", (0.040, 0.008, 0.014), (0.0, F_MOUTH, 0.070),
-             M["skin_dark"], bevel=0.003))
-    # scar through her LEFT eyebrow (+X), a thin dark inset bar
-    P(_plate("LYS_scar", (0.0080, 0.054, 0.012), (0.047, F_BROW + 0.004, 0.063),
-             M["scar"], rot=(0, 0, math.radians(-14)), bevel=0.002))
+    P(_face_part("LYS_mouth", 0.0, F_MOUTH, (0.042, 0.009, 0.010),
+                 M["skin_dark"], proud=0.0005))
+    # scar through her LEFT eyebrow (+X): a thin inset bar, same curve
+    P(_face_part("LYS_scar", 0.048, F_BROW + 0.006, (0.009, 0.056, 0.010),
+                 M["scar"], proud=0.0015, tilt=math.radians(-13)))
     # ears
     for side, sx in (("R", -1.0), ("L", 1.0)):
         P(_organic_box(f"LYS_ear_{side}", (0.015, 0.042, 0.026),
@@ -673,12 +738,12 @@ def build():
 
     # ------------------------------------------------ hair + tight braid --
     P(_tube("LYS_hair_cap",
-            [(0.0, Y_BROW + 0.006, -0.004), (0.0, 1.806, -0.010),
-             (0.0, 1.832, -0.016), (0.0, Y_TOP - 0.006, -0.024)],
-            [(0.096, 0.108), (0.096, 0.110), (0.084, 0.096), (0.050, 0.060)],
+            [(0.0, Y_BROW + 0.006, -0.004), (0.0, 1.794, -0.010),
+             (0.0, 1.810, -0.016), (0.0, Y_TOP - 0.036, -0.024)],
+            [(0.096, 0.108), (0.095, 0.109), (0.080, 0.092), (0.046, 0.056)],
             M["hair"]))
     P(_tube("LYS_hair_back",
-            [(0.0, 1.830, -0.028), (0.0, 1.766, -0.048), (0.0, 1.700, -0.062),
+            [(0.0, 1.820, -0.028), (0.0, 1.762, -0.048), (0.0, 1.700, -0.062),
              (0.0, 1.640, -0.072), (0.0, 1.604, -0.076)],
             [(0.086, 0.070), (0.092, 0.072), (0.088, 0.066), (0.072, 0.052),
              (0.054, 0.040)],
@@ -726,14 +791,14 @@ def build():
         rr = 0.090
         x = rr * math.sin(a)
         z = rr * math.cos(a) - 0.006
-        hs = 0.030 - 0.011 * abs(t - 0.5) * 2.0
-        P(_plate(f"LYS_diadem_{i}", (0.024, hs, 0.014),
+        hs = 0.024 - 0.009 * abs(t - 0.5) * 2.0
+        P(_plate(f"LYS_diadem_{i}", (0.021, hs, 0.012),
                  (x, DIA_Y, z), M["crystal"],
                  rot=(0, a, 0), bevel=0.003))
     P(_tube("LYS_diadem_band",
-            [(0.0, DIA_Y - 0.010, -0.004), (0.0, DIA_Y + 0.008, -0.004)],
+            [(0.0, DIA_Y - 0.007, -0.004), (0.0, DIA_Y + 0.006, -0.004)],
             [(0.089, 0.100), (0.088, 0.099)],
-            M["gold"], subdiv=0, smooth=False, caps=False, thickness=0.009, bevel=0.003))
+            M["gold"], subdiv=0, smooth=False, caps=False, thickness=0.007, bevel=0.002))
     spire = add_cone("LYS_diadem_crystal", 0.019, 0.0, 0.046,
                      (0.0, DIA_Y + 0.024, 0.074), rotation=(math.radians(14), 0, 0),
                      vertices=6)
