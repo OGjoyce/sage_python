@@ -10,3 +10,8 @@ agent/sessions/
 # per-module preview renders from scenes/*/_test_module.py
 scenes/**/_test_*.png
 scenes/**/evening_breath_*.png
+
+# WebGL viewer: third-party three.js and the generated scene payload --
+# both regenerable, neither belongs in the repo
+scenes/**/viewer/vendor/
+scenes/**/*.glb

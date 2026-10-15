@@ -715,5 +715,11 @@ for obj in bpy.data.objects:
 print(f"SCENE: quality={QUALITY} res={RESOLUTION} samples={SAMPLES} triangles={tri}")
 print(f"SCENE: rendering -> {OUT}")
 
-cs.render.render_still()
-print(f"SCENE: wrote {OUT}")
+# --no-render lets another script (export_gltf.py, orbit_anim.py) import this
+# module purely to BUILD the assembled, placed, lit scene and then do its own
+# thing with it, instead of duplicating 500 lines of placement and lighting.
+if _flag("--no-render"):
+    print("SCENE: built (--no-render), skipping render")
+else:
+    cs.render.render_still()
+    print(f"SCENE: wrote {OUT}")
