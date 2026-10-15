@@ -205,7 +205,7 @@ def _materials():
     m["ichor"], _ = cs.materials.new_principled_material(
         TAG + "ichor",
         base_color=ICHOR,
-        roughness=0.21,
+        roughness=0.30,
         emission_color=(TEAL_CRACK[0] * 0.10, TEAL_CRACK[1] * 0.10, TEAL_CRACK[2] * 0.10, 1.0),
         emission_strength=1.0,
     )
@@ -219,7 +219,7 @@ def _materials():
     m["ichor_pool"], bsdf = cs.materials.new_principled_material(
         TAG + "ichor_pool",
         base_color=ICHOR,
-        roughness=0.13,
+        roughness=0.34,
         emission_color=(TEAL_CRACK[0] * 0.06, TEAL_CRACK[1] * 0.06, TEAL_CRACK[2] * 0.06, 1.0),
         emission_strength=0.5,
     )
@@ -469,13 +469,16 @@ def _build_fiend(mats, parent):
 # ====================================================== the severed head ==
 # After the roll+yaw below the neck stump points roughly toward +X and a
 # little -Z; the pool and the crack web are laid out along that direction.
-HEAD_YAW = math.radians(-32.0)
-POOL_DIR = math.radians(-21.0)
+HEAD_YAW = math.radians(-78.0)
+# sized so the skull itself is ~0.50 m long (scene_main needs no extra scale)
+HEAD_SCALE = 1.18
+# the local direction the neck stump points before the head is rolled
+STUMP_DIR_LOCAL = Vector((0.0, -0.60, -0.80)).normalized()
 
 
-def _pool_rot(x, z):
-    c, s = math.cos(POOL_DIR), math.sin(POOL_DIR)
-    return x * c + z * s, -x * s + z * c
+def _rot_xz(x, z, ang):
+    c, s = math.cos(ang), math.sin(ang)
+    return x * c - z * s, x * s + z * c
 
 
 # Built upright in a local frame (face +Z, up +Y) under PROP_head_pivot,
@@ -489,19 +492,20 @@ def _build_head_mesh(mats, pivot):
     # (cx, cy, cz, half_width, half_height) — +Z is the muzzle direction
     skull_rings = [
         (0.0, 0.040, -0.175, 0.050, 0.055),
-        (0.0, 0.045, -0.140, 0.098, 0.098),
-        (0.0, 0.048, -0.075, 0.125, 0.120),
-        (0.0, 0.048, -0.010, 0.128, 0.122),
-        (0.0, 0.040, 0.045, 0.118, 0.112),
-        (0.0, 0.022, 0.090, 0.098, 0.098),   # brow / eye line
-        (0.0, -0.002, 0.140, 0.072, 0.080),  # muzzle
-        (0.0, -0.016, 0.195, 0.052, 0.060),
-        (0.0, -0.022, 0.235, 0.034, 0.040),  # snout tip
+        (0.0, 0.045, -0.140, 0.100, 0.100),
+        (0.0, 0.048, -0.075, 0.128, 0.124),
+        (0.0, 0.046, -0.010, 0.128, 0.126),
+        (0.0, 0.038, 0.050, 0.118, 0.118),
+        (0.0, 0.020, 0.100, 0.100, 0.100),   # brow / eye line
+        (0.0, -0.006, 0.150, 0.066, 0.076),  # muzzle narrows sharply here
+        (0.0, -0.020, 0.205, 0.052, 0.064),
+        (0.0, -0.030, 0.255, 0.040, 0.048),
+        (0.0, -0.038, 0.290, 0.024, 0.030),  # snout tip
     ]
     skin.append(_loft(TAG + "head_skull", skull_rings, levels=3))
 
     # heavy brow ridge sitting over the sockets
-    brow = add_box(TAG + "head_brow", (0.225, 0.052, 0.105), (0.0, 0.072, 0.072),
+    brow = add_box(TAG + "head_brow", (0.215, 0.052, 0.110), (0.0, 0.062, 0.086),
                    rotation=(0.20, 0.0, 0.0), bevel_width=0.006, bevel_segments=2)
     _organic(brow, levels=2)
     skin.append(brow)
@@ -515,14 +519,14 @@ def _build_head_mesh(mats, pivot):
 
     # slack lower jaw, hanging open — dead weight
     jaw = _loft(TAG + "head_jaw", [
-        (0.0, -0.030, -0.075, 0.070, 0.050),
-        (0.0, -0.045, -0.010, 0.098, 0.060),
-        (0.0, -0.052, 0.060, 0.100, 0.058),
-        (0.0, -0.056, 0.130, 0.080, 0.050),
-        (0.0, -0.052, 0.190, 0.054, 0.038),
-        (0.0, -0.048, 0.225, 0.030, 0.024),
+        (0.0, -0.030, -0.080, 0.062, 0.046),
+        (0.0, -0.048, -0.010, 0.082, 0.054),
+        (0.0, -0.058, 0.070, 0.080, 0.050),
+        (0.0, -0.062, 0.140, 0.064, 0.044),
+        (0.0, -0.060, 0.205, 0.044, 0.034),
+        (0.0, -0.056, 0.255, 0.024, 0.022),
     ], levels=3)
-    jaw.rotation_euler = (0.28, 0.0, 0.0)   # hinged slack open
+    jaw.rotation_euler = (0.42, 0.0, 0.0)   # hinged slack open
     jaw.location = (0.0, 0.005, -0.020)
     skin.append(jaw)
 
@@ -543,25 +547,25 @@ def _build_head_mesh(mats, pivot):
         for i in range(4):
             f = i / 3.0
             t = add_cone(TAG + f"head_tooth_u_{i}_{s}", 0.0090, 0.0015, 0.026,
-                         (s * (0.046 - 0.014 * f), -0.052 - 0.003 * f, 0.145 + 0.045 * f),
+                         (s * (0.046 - 0.014 * f), -0.054 - 0.004 * f, 0.165 + 0.042 * f),
                          rotation=(math.pi + 0.15, 0.0, 0.0), vertices=6)
             other.append((t, mats["bone"]))
         for i in range(3):
             f = i / 2.0
             t = add_cone(TAG + f"head_tooth_l_{i}_{s}", 0.0080, 0.0015, 0.022,
-                         (s * (0.042 - 0.010 * f), -0.032 - 0.018 * f, 0.078 + 0.040 * f),
+                         (s * (0.040 - 0.010 * f), -0.036 - 0.020 * f, 0.105 + 0.048 * f),
                          rotation=(-0.30, 0.0, 0.0), vertices=6)
             other.append((t, mats["bone"]))
 
     # ---- horns: continuous tapering sweeps back off the skull ----
     for s in (-1, 1):
         horn = _ribbon(TAG + f"head_horn_{s}", [
-            Vector((s * 0.098, 0.118, -0.020)),
-            Vector((s * 0.136, 0.186, -0.075)),
-            Vector((s * 0.152, 0.222, -0.150)),
-            Vector((s * 0.140, 0.212, -0.232)),
-            Vector((s * 0.118, 0.178, -0.280)),
-        ], [0.040, 0.030, 0.021, 0.012, 0.004])
+            Vector((s * 0.088, 0.104, 0.000)),
+            Vector((s * 0.102, 0.212, -0.080)),
+            Vector((s * 0.110, 0.300, -0.205)),
+            Vector((s * 0.108, 0.348, -0.350)),
+            Vector((s * 0.100, 0.352, -0.480)),
+        ], [0.048, 0.037, 0.026, 0.016, 0.005])
         other.append((horn, mats["horn"]))
         # cheek spur and brow spike
         sp = _ribbon(TAG + f"head_spur_{s}",
@@ -584,18 +588,18 @@ def _build_head_mesh(mats, pivot):
 
     # ---- eyes: rolled white, a last cyan flicker guttering out ----
     for s in (-1, 1):
-        c = Vector((s * 0.066, 0.036, 0.086))
-        eb = _sphere(TAG + f"head_eye_{s}", 0.032, tuple(c), subdivisions=3)
+        c = Vector((s * 0.062, 0.030, 0.098))
+        eb = _sphere(TAG + f"head_eye_{s}", 0.037, tuple(c), subdivisions=3)
         other.append((eb, mats["eye"]))
         # the iris has rolled up and back — only a sliver of it still shows
         gdir = Vector((s * 0.35, 0.82, 0.45)).normalized()
-        gl = _sphere(TAG + f"head_flicker_{s}", 0.0140, tuple(c + gdir * 0.025),
+        gl = _sphere(TAG + f"head_flicker_{s}", 0.0165, tuple(c + gdir * 0.029),
                      subdivisions=2)
         gl.scale = (1.3, 0.75, 1.3)
         other.append((gl, mats["eye_flicker"]))
         # slack lower lid
-        lid = _seg(TAG + f"head_lid_{s}", (s * 0.044, 0.012, 0.110),
-                   (s * 0.104, 0.018, 0.070), 0.020, 0.016, 0.60, levels=2)
+        lid = _seg(TAG + f"head_lid_{s}", (s * 0.040, 0.004, 0.124),
+                   (s * 0.098, 0.012, 0.082), 0.020, 0.016, 0.60, levels=2)
         skin.append(lid)
 
     # ---- ragged neck stump: back-under the skull, cleanly severed ----
@@ -631,7 +635,7 @@ def _build_head_mesh(mats, pivot):
     return objs
 
 
-def _build_pool(mats, parent):
+def _build_pool(mats, parent, pool_dir):
     """Flat irregular ichor pool spreading from the stump (which, after the
     head is rolled onto its cheek, points toward +X), plus satellite
     splatters and thin runnels. Sits at Y=0.004 to clear the floor."""
@@ -648,15 +652,17 @@ def _build_pool(mats, parent):
         (0.20, -0.22, 0.17, 0.95, 1.15),
         (0.16, 0.24, 0.16, 1.0, 1.1),
         (0.70, -0.04, 0.13, 1.0, 1.0),
-        (-0.14, 0.08, 0.20, 1.0, 1.1),
-        (-0.30, -0.06, 0.14, 1.0, 0.9),
+        (-0.14, 0.08, 0.22, 1.0, 1.1),
+        (-0.32, -0.04, 0.17, 1.1, 0.95),
+        (-0.46, 0.12, 0.12, 1.0, 0.9),
+        (-0.10, -0.20, 0.15, 1.0, 1.0),
         (0.40, 0.26, 0.13, 1.15, 0.9),
         (0.50, -0.26, 0.12, 1.1, 0.95),
         (-0.06, -0.26, 0.12, 1.0, 0.9),
         (0.86, 0.06, 0.09, 1.2, 0.8),
     ]
     S = 0.72   # overall spread of the pool, in metres of radius scale
-    blobs = [_pool_rot(x * S, z * S) + (r * S, sx, sz)
+    blobs = [_rot_xz(x * S, z * S, pool_dir) + (r * S, sx, sz)
              for (x, z, r, sx, sz) in blobs]
     for i, (x, z, r, sx, sz) in enumerate(blobs):
         # NOTE euler XYZ applies X first, so the in-plane spin must go in the
@@ -671,7 +677,7 @@ def _build_pool(mats, parent):
         a = rng.uniform(-1.2, 1.9)
         rr = rng.uniform(0.55, 1.15) * S
         r = rng.uniform(0.022, 0.085) * S
-        sx_, sz_ = _pool_rot(0.25 * S + math.cos(a) * rr, math.sin(a) * rr * 0.75)
+        sx_, sz_ = _rot_xz(0.25 * S + math.cos(a) * rr, math.sin(a) * rr * 0.75, pool_dir)
         b = add_cylinder(TAG + f"splat_{i}", r, 0.008, (sx_, y, sz_),
                          rotation=(math.pi / 2, rng.uniform(0, 3.0), 0.0), vertices=10)
         b.scale = (rng.uniform(0.7, 1.9), rng.uniform(0.6, 1.2), 1.0)
@@ -680,8 +686,8 @@ def _build_pool(mats, parent):
     # thin runnels creeping out of the pool
     for i in range(7):
         a = rng.uniform(-1.0, 1.6)
-        x0, z0 = _pool_rot((0.30 + math.cos(a) * 0.38) * S, math.sin(a) * 0.30 * S)
-        a = a + POOL_DIR
+        x0, z0 = _rot_xz((0.30 + math.cos(a) * 0.38) * S, math.sin(a) * 0.30 * S, pool_dir)
+        a = a - pool_dir
         L = rng.uniform(0.20, 0.52) * S
         run = add_box(TAG + f"runnel_{i}", (0.026 + rng.uniform(0, 0.018), 0.008, L),
                       (x0 + math.cos(a) * L * 0.5, y, z0 + math.sin(a) * L * 0.5),
@@ -693,16 +699,16 @@ def _build_pool(mats, parent):
     return objs
 
 
-def _build_cracks(mats, parent):
+def _build_cracks(mats, parent, pool_dir):
     """Spiderweb fracture radiating in the crystal under the head."""
     rng = random.Random(3)
     objs = []
-    y = 0.002
+    y = 0.0014            # all but flush with the floor plane
     idx = 0
 
     def bar(x0, z0, ang, length, width):
         nonlocal idx
-        b = add_box(TAG + f"crack_{idx}", (width, 0.0045, length),
+        b = add_box(TAG + f"crack_{idx}", (width, 0.0016, length),
                     (x0 + math.sin(ang) * length * 0.5, y, z0 + math.cos(ang) * length * 0.5),
                     rotation=(0.0, ang, 0.0))
         idx += 1
@@ -710,31 +716,31 @@ def _build_cracks(mats, parent):
 
     for i in range(17):
         a = i / 17.0 * math.tau + rng.uniform(-0.09, 0.09)
-        x, z = math.cos(a) * 0.05, math.sin(a) * 0.05
+        x, z = _rot_xz(math.cos(a) * 0.05, math.sin(a) * 0.05, pool_dir)
         ang = math.pi / 2 - a
-        total = rng.uniform(0.35, 0.80)
+        total = rng.uniform(0.26, 0.62)
         walked = 0.0
-        w = 0.013
+        w = 0.009
         while walked < total:
-            L = min(rng.uniform(0.12, 0.26), total - walked)
+            L = min(rng.uniform(0.10, 0.22), total - walked)
             bar(x, z, ang, L, w)
             x += math.sin(ang) * L
             z += math.cos(ang) * L
             walked += L
             ang += rng.uniform(-0.34, 0.34)
-            w = max(0.005, w * 0.78)
+            w = max(0.0035, w * 0.78)
             # branch
             if rng.random() < 0.45 and walked < total * 0.8:
                 ba = ang + rng.choice((-1, 1)) * rng.uniform(0.5, 1.0)
-                bar(x, z, ba, rng.uniform(0.10, 0.26), max(0.004, w * 0.8))
+                bar(x, z, ba, rng.uniform(0.07, 0.19), max(0.003, w * 0.8))
 
     # a few concentric chordal cracks tying the web together
     for i in range(9):
         a = rng.uniform(0, math.tau)
-        rr = rng.uniform(0.15, 0.50)
+        rr = rng.uniform(0.12, 0.42)
         bar(math.cos(a) * rr, math.sin(a) * rr,
             math.pi / 2 - a + math.pi / 2 + rng.uniform(-0.3, 0.3),
-            rng.uniform(0.10, 0.30), rng.uniform(0.005, 0.010))
+            rng.uniform(0.10, 0.30), rng.uniform(0.0035, 0.007))
 
     _mat_all(objs, mats["crack"])
     _parent_to(objs, parent)
@@ -769,7 +775,7 @@ def build():
     # about the world axis after the yaw, which faceplants the head.
     pivot.rotation_mode = "ZYX"
     pivot.rotation_euler = (math.radians(-9.0), HEAD_YAW, math.radians(86.0))
-    pivot.scale = (0.88, 0.88, 0.88)
+    pivot.scale = (HEAD_SCALE, HEAD_SCALE, HEAD_SCALE)
     head_objs = _build_head_mesh(mats, pivot)
 
     # drop the rolled head so its lowest point just sinks into the pool
@@ -785,8 +791,11 @@ def build():
     pivot.location = (0.0, 0.012 - low, 0.0)
     bpy.context.view_layer.update()
 
-    _build_pool(mats, head_root)
-    _build_cracks(mats, head_root)
+    # spread the pool along the direction the stump actually ends up facing
+    sd = pivot.matrix_world.to_3x3() @ STUMP_DIR_LOCAL
+    pool_dir = math.atan2(sd.z, sd.x)
+    _build_pool(mats, head_root, pool_dir)
+    _build_cracks(mats, head_root, pool_dir)
 
     return {"root": root, "fiend": fiend_root, "head": head_root}
 

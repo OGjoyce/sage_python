@@ -80,8 +80,8 @@ def _mats():
     """Every material this module uses, ENV_-prefixed."""
     m = {}
     m["floor"] = cs.materials.new_principled_material(
-        "ENV_crystal_floor", base_color=CRYSTAL, roughness=0.05,
-        transmission=0.92, ior=1.48)[0]
+        "ENV_crystal_floor", base_color=(0.78, 0.86, 0.93, 1.0), roughness=0.035,
+        transmission=0.96, ior=1.45)[0]
     m["floor_rim"] = cs.materials.new_principled_material(
         "ENV_crystal_rim", base_color=(0.46, 0.58, 0.69, 1.0), roughness=0.22,
         transmission=0.55, ior=1.5)[0]
@@ -97,25 +97,27 @@ def _mats():
     m["pillar"] = cs.materials.new_principled_material(
         "ENV_crystal_pillar", base_color=(0.60, 0.71, 0.80, 1.0), roughness=0.14,
         transmission=0.58, ior=1.5)[0]
-    # NOTE on emission levels: scene_main renders with view_transform
-    # "Standard", i.e. no tone-mapping, so anything above ~1.2 clips to
-    # white. UNDERLOOM at 4.0 reads as (4.0, 1.0, 0.22) -- the red channel
-    # blows out while green/blue stay in range, which is exactly the
-    # saturated molten orange-red we want. Pushed to 10+ every channel
-    # clips and the hell below turns into a flat white lightbox. These are
-    # still the brightest things in the scene and the shot's warm uplight.
+    # NOTE on emission levels: these are authored for scene_main's shot
+    # emission grade (x0.26, with per-prefix ceilings: ENV_glyph* 1.75,
+    # ENV_under* 3.20, ENV_shimmer* 0.55), because the final render uses
+    # view_transform "Standard" where anything over 1.0 clips flat to
+    # white. e.g. the Underloom's 12.0 grades to 3.12 -> (3.12, 0.78,
+    # 0.17): the red channel blows out while green/blue stay in range,
+    # which is the saturated molten orange-red the brief asks for. In this
+    # module's own standalone test render (which is NOT graded) these read
+    # hot and clipped -- that is expected.
     m["underloom"] = cs.materials.new_principled_material(
         "ENV_underloom", base_color=(0.02, 0.01, 0.01, 1.0), roughness=1.0,
-        emission_color=UNDERLOOM, emission_strength=4.0)[0]
+        emission_color=UNDERLOOM, emission_strength=12.0)[0]
     m["underloom_hot"] = cs.materials.new_principled_material(
         "ENV_underloom_hot", base_color=(0.02, 0.01, 0.01, 1.0), roughness=1.0,
-        emission_color=(1.0, 0.38, 0.10, 1.0), emission_strength=7.0)[0]
+        emission_color=(1.0, 0.38, 0.10, 1.0), emission_strength=20.0)[0]
     m["underloom_dark"] = cs.materials.new_principled_material(
         "ENV_underloom_dark", base_color=(0.03, 0.01, 0.01, 1.0), roughness=1.0,
-        emission_color=(0.55, 0.09, 0.02, 1.0), emission_strength=1.6)[0]
+        emission_color=(0.70, 0.12, 0.03, 1.0), emission_strength=5.0)[0]
     m["crack"] = cs.materials.new_principled_material(
-        "ENV_floor_crack", base_color=(0.05, 0.01, 0.0, 1.0), roughness=0.9,
-        emission_color=(1.0, 0.30, 0.06, 1.0), emission_strength=4.5)[0]
+        "ENV_underloom_crack", base_color=(0.05, 0.01, 0.0, 1.0), roughness=0.9,
+        emission_color=(1.0, 0.30, 0.06, 1.0), emission_strength=14.0)[0]
     m["crust"] = cs.materials.new_principled_material(
         "ENV_underloom_crust", base_color=(0.045, 0.022, 0.016, 1.0), roughness=0.96)[0]
     m["glyph"] = cs.materials.new_principled_material(
@@ -126,17 +128,23 @@ def _mats():
         emission_color=(1.0, 0.88, 0.45, 1.0), emission_strength=7.5)[0]
     m["glyph_dim"] = cs.materials.new_principled_material(
         "ENV_glyph_gold_dim", base_color=GOLD_LAW, roughness=0.35,
-        emission_color=GOLD_LAW, emission_strength=2.2)[0]
+        emission_color=GOLD_LAW, emission_strength=3.0)[0]
     m["shimmer"] = cs.materials.new_principled_material(
         "ENV_gate_shimmer", base_color=(0.80, 0.88, 0.95, 1.0), roughness=0.10,
         transmission=0.96, ior=1.04,
-        emission_color=(1.0, 0.72, 0.42, 1.0), emission_strength=0.22)[0]
+        emission_color=(1.0, 0.72, 0.42, 1.0), emission_strength=1.20)[0]
     m["cloud"] = cs.materials.new_principled_material(
-        "ENV_cloud", base_color=(0.93, 0.87, 0.82, 1.0), roughness=0.92,
-        emission_color=(1.0, 0.62, 0.34, 1.0), emission_strength=0.18)[0]
+        "ENV_cloud", base_color=(0.95, 0.90, 0.86, 1.0), roughness=0.95,
+        emission_color=(1.0, 0.64, 0.36, 1.0), emission_strength=0.70)[0]
+    m["cloud_lit"] = cs.materials.new_principled_material(
+        "ENV_cloud_lit", base_color=(0.97, 0.93, 0.89, 1.0), roughness=0.95,
+        emission_color=(1.0, 0.70, 0.42, 1.0), emission_strength=1.30)[0]
+    m["cloud_shadow"] = cs.materials.new_principled_material(
+        "ENV_cloud_shadow", base_color=(0.56, 0.45, 0.46, 1.0), roughness=0.98,
+        emission_color=(0.75, 0.30, 0.22, 1.0), emission_strength=0.30)[0]
     m["cloud_deck"] = cs.materials.new_principled_material(
-        "ENV_cloud_deck", base_color=(0.80, 0.70, 0.64, 1.0), roughness=0.95,
-        emission_color=(1.0, 0.50, 0.26, 1.0), emission_strength=0.30)[0]
+        "ENV_cloud_deck", base_color=(0.82, 0.70, 0.66, 1.0), roughness=0.97,
+        emission_color=(1.0, 0.52, 0.30, 1.0), emission_strength=0.90)[0]
     return m
 
 
@@ -205,9 +213,11 @@ def _build_island(mats, rng):
     top, bot = [], []
     for i in range(n_seg):
         a = 2.0 * math.pi * i / n_seg
-        r = _island_radius(a, rng.uniform(-1.7, 1.2))
-        if rng.random() < 0.18:
-            r -= rng.uniform(1.4, 3.2)          # bitten-out notch
+        base = _island_radius(a)
+        r = base + rng.uniform(-1.6, 1.3)
+        if rng.random() < 0.20:
+            r -= rng.uniform(1.2, 2.8)          # bitten-out notch
+        r = max(r, base - 1.9)                  # never bite past the colonnade
         top.append(bm.verts.new((math.cos(a) * r, FLOOR_TOP, math.sin(a) * r)))
         r2 = r - rng.uniform(0.15, 0.95)
         bot.append(bm.verts.new((math.cos(a) * r2, FLOOR_TOP - FLOOR_THICK,
@@ -307,38 +317,54 @@ def _build_shards(mats, rng):
 
 def _build_cracks(mats, rng):
     """Branching molten veins sunk just under the floor's top surface, so
-    the underglow reads uneven and alive rather than as a flat wash."""
+    the underglow reads uneven and alive rather than as a flat wash.
+
+    Deliberately densest over the hero zone (x -5..5, z -3..6) — the patch
+    of floor between the two figures, where the "hell seen through the
+    crystal" beat has to land."""
     parts = []
     idx = 0
-    for seed_i in range(16):
-        a0 = rng.uniform(0, 2 * math.pi)
-        r0 = rng.uniform(1.0, 13.0)
-        x, z = math.cos(a0) * r0, math.sin(a0) * r0
-        heading = rng.uniform(0, 2 * math.pi)
-        for _ in range(rng.randint(3, 6)):
-            length = rng.uniform(1.2, 4.0)
-            heading += rng.uniform(-0.9, 0.9)
-            cx = x + math.cos(heading) * length * 0.5
-            cz = z + math.sin(heading) * length * 0.5
+
+    def vein(x, z, heading, steps, scale=1.0):
+        nonlocal idx
+        for _ in range(steps):
+            length = rng.uniform(0.8, 2.6) * scale
+            heading_local = heading + rng.uniform(-0.8, 0.8)
+            cx = x + math.cos(heading_local) * length * 0.5
+            cz = z + math.sin(heading_local) * length * 0.5
             if math.hypot(cx, cz) > _island_radius(math.atan2(cz, cx)) - 1.5:
-                break
+                return
             b = add_box(f"ENV_crack_{idx}",
-                        (length, 0.09, rng.uniform(0.07, 0.26)),
-                        (cx, FLOOR_TOP - 0.10, cz),
-                        rotation=(0.0, -heading, 0.0))
+                        (length, 0.05, rng.uniform(0.05, 0.17)),
+                        (cx, FLOOR_TOP - 0.07, cz),
+                        rotation=(0.0, -heading_local, 0.0))
             assign_material(b, mats["crack"])
             parts.append(b)
             idx += 1
-            x += math.cos(heading) * length
-            z += math.sin(heading) * length
+            x += math.cos(heading_local) * length
+            z += math.sin(heading_local) * length
+            heading = heading_local
+
+    # hero zone: the floor the camera actually studies, between the figures
+    for _ in range(26):
+        x = rng.uniform(-5.5, 5.5)
+        z = rng.uniform(-3.5, 6.5)
+        vein(x, z, rng.uniform(0, 2 * math.pi), rng.randint(3, 6), 0.8)
+    # the rest of the island, sparser and longer
+    for _ in range(22):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(4.0, 15.0)
+        vein(math.cos(a) * r, math.sin(a) * r, rng.uniform(0, 2 * math.pi),
+             rng.randint(3, 6), 1.4)
+
     # molten veining pressed against the slab underside: long thin slivers,
     # not slabs, so the glow under the glass stays filamentary
-    for i in range(54):
+    for i in range(70):
         a = rng.uniform(0, 2 * math.pi)
-        r = rng.uniform(0.5, 16.0)
+        r = rng.uniform(0.5, 16.0) ** 0.9
         b = add_box(f"ENV_pool_{i}",
-                    (rng.uniform(0.9, 4.5), 0.04, rng.uniform(0.07, 0.5)),
-                    (math.cos(a) * r, FLOOR_TOP - FLOOR_THICK + 0.06, math.sin(a) * r),
+                    (rng.uniform(0.9, 4.0), 0.04, rng.uniform(0.06, 0.4)),
+                    (math.cos(a) * r, FLOOR_TOP - FLOOR_THICK + 0.05, math.sin(a) * r),
                     rotation=(0.0, rng.uniform(0, 3.0), 0.0))
         assign_material(b, mats["underloom_hot" if i % 5 == 0 else "crack"])
         parts.append(b)
@@ -410,6 +436,29 @@ def _build_underloom(mats, rng):
                      math.sin(a) * r),
                     rotation=(rng.uniform(-0.18, 0.18), rng.uniform(0, 3.0),
                               rng.uniform(-0.18, 0.18)))
+        assign_material(b, mats["crust"])
+        parts.append(b)
+    # a brighter vent right under the sanctuary's middle, so the floor the
+    # two figures stand on has hell directly beneath it rather than off to
+    # one side
+    for i in range(14):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(0.0, 7.5)
+        b = add_box(f"ENV_underloom_vent_{i}",
+                    (rng.uniform(2.5, 6.5), 0.12, rng.uniform(2.0, 5.5)),
+                    (math.cos(a) * r + 0.5, rng.uniform(-6.4, -4.6), math.sin(a) * r + 1.0),
+                    rotation=(rng.uniform(-0.2, 0.2), rng.uniform(0, 3.0),
+                              rng.uniform(-0.2, 0.2)))
+        assign_material(b, mats["underloom_hot" if i % 3 else "underloom"])
+        parts.append(b)
+    for i in range(10):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(5.0, 12.0)
+        b = add_box(f"ENV_underloom_ventcrust_{i}",
+                    (rng.uniform(2.5, 7.0), rng.uniform(0.4, 1.0), rng.uniform(2.5, 6.0)),
+                    (math.cos(a) * r, rng.uniform(-5.6, -3.4), math.sin(a) * r),
+                    rotation=(rng.uniform(-0.25, 0.25), rng.uniform(0, 3.0),
+                              rng.uniform(-0.25, 0.25)))
         assign_material(b, mats["crust"])
         parts.append(b)
     return join_parts(parts, "ENV_underloom")
@@ -601,80 +650,146 @@ def _build_shimmer(mats):
 
 # ---------------------------------------------------------- colonnade ----
 
-# (|x|, z, height, broken). Kept outside +-4.5 m on X anywhere in front of
-# Z = -4 so the two foreground figures are never blocked, and clear of both
-# the gate footprint and the background fiend's mark at (-7.5, 0, -18).
-PILLARS = [
-    (6.90, 2.2, 8.2, False),
-    (7.85, -2.8, 9.0, False),
-    (8.75, -7.6, 9.8, True),
-    (9.20, -12.6, 10.4, False),
-    (10.10, -17.4, 8.6, True),
-]
+def _pillar_slots():
+    """A sanctuary colonnade laid out on a ring around the island.
+
+    A ring (rather than two straight files) guarantees that, whatever
+    direction scene_main throws its warm key from, the light meets a row of
+    solid occluders with even gaps between them — which is what cuts the
+    volumetrics into distinct shafts. Spacing is ~3.3 m between 1.7 m-thick
+    shafts, i.e. a ~1.6 m gap per pillar: solid enough to block, open
+    enough to beam.
+
+    Skipped on purpose:
+      * the front arc toward the camera, and anything inside +-4.5 m on X
+        in front of Z = -4 (the two foreground figures' ground)
+      * the corridor seen through the gate's opening (|x| < 7.5 behind
+        Z = -10), so the arch stays OPEN onto sky, cloud and the
+        background fiend at (-7.5, 0, -18)
+      * the arch's own footprint
+    """
+    slots = []
+    heights = (10.6, 9.2, 11.4, 9.8, 8.4, 10.2)
+    for i in range(24):
+        phi = math.radians(i * 15.0)          # 0 deg = +Z (toward camera)
+        r = 11.8 + (0.6 if i % 2 else -0.4)
+        x, z = r * math.sin(phi), r * math.cos(phi)
+        if z > 6.0:
+            continue                          # behind/next to the camera
+        if z < -10.0 and abs(x) < 7.5:
+            continue                          # keep the gate's view open
+        if -15.0 < z < -9.0 and 3.0 < abs(x) < 8.2:
+            continue                          # arch legs live here
+        broken = i in (13, 20)
+        slots.append((x, z, heights[i % len(heights)] - (2.8 if broken else 0.0), broken))
+    # a second, staggered rank out in the back-left and back-right quadrants:
+    # two offset rows of occluders is what turns a backlight into separate
+    # shafts instead of one wide wash.
+    for j, deg in enumerate((112.5, 127.5, 142.5, 217.5, 232.5, 247.5)):
+        phi = math.radians(deg)
+        r = (14.2, 16.2, 17.4, 17.4, 16.2, 14.2)[j]
+        x, z = r * math.sin(phi), r * math.cos(phi)
+        broken = j in (2, 3)
+        slots.append((x, z, (9.6, 11.0, 8.8, 9.4, 10.8, 8.6)[j] - (2.6 if broken else 0.0),
+                      broken))
+    return slots
 
 
 def _build_pillars(mats, rng):
     parts = []
-    for pi, (ax, z, h, broken) in enumerate(PILLARS):
-        for s in (-1, 1):
-            x = s * ax
-            tag = f"{pi}{'R' if s > 0 else 'L'}"
-            base = add_box(f"ENV_pil_base_{tag}", (2.20, 0.36, 2.20),
-                           (x, 0.18, z), bevel_width=0.03, bevel_segments=2)
-            assign_material(base, mats["arch_deep"])
-            parts.append(base)
-            base2 = add_box(f"ENV_pil_base2_{tag}", (1.85, 0.26, 1.85),
-                            (x, 0.48, z), bevel_width=0.03, bevel_segments=2)
-            assign_material(base2, mats["arch_deep"])
-            parts.append(base2)
-            shaft_h = h - 1.3
-            shaft = add_cylinder(f"ENV_pil_shaft_{tag}", 0.72, shaft_h,
-                                 (x, 0.6 + shaft_h * 0.5, z), vertices=10)
-            shaft.rotation_euler = (math.pi / 2.0, 0.0, 0.0)  # cylinder is +Z long
-            assign_material(shaft, mats["pillar"])
-            parts.append(shaft)
-            if broken:
-                # snapped top: an angled shear cap, no capital
-                cap = add_cone(f"ENV_pil_snap_{tag}", 0.78, 0.30, 1.1,
-                               (x + rng.uniform(-0.12, 0.12), 0.6 + shaft_h + 0.4, z),
-                               rotation=(rng.uniform(-0.3, 0.3), 0.0,
-                                         rng.uniform(-0.3, 0.3)), vertices=7)
-                assign_material(cap, mats["pillar"])
-                parts.append(cap)
-            else:
-                nk = add_box(f"ENV_pil_neck_{tag}", (1.62, 0.24, 1.62),
-                             (x, 0.6 + shaft_h + 0.12, z), bevel_width=0.02)
-                assign_material(nk, mats["arch_deep"])
-                parts.append(nk)
-                cap = add_box(f"ENV_pil_cap_{tag}", (2.0, 0.55, 2.0),
-                              (x, 0.6 + shaft_h + 0.52, z),
-                              bevel_width=0.04, bevel_segments=2)
-                assign_material(cap, mats["pillar"])
-                parts.append(cap)
-                top = add_box(f"ENV_pil_abacus_{tag}", (1.7, 0.32, 1.7),
-                              (x, 0.6 + shaft_h + 0.96, z), bevel_width=0.03)
-                assign_material(top, mats["arch_deep"])
-                parts.append(top)
-                # a single glyph stud on the camera-facing side of the capital
-                g = add_box(f"ENV_pil_glyph_{tag}", (0.34, 0.34, 0.08),
-                            (x, 0.6 + shaft_h + 0.52, z + 1.02))
-                assign_material(g, mats["glyph"])
-                parts.append(g)
+    for pi, (x, z, h, broken) in enumerate(_pillar_slots()):
+        tag = f"{pi}"
+        base = add_box(f"ENV_pil_base_{tag}", (2.45, 0.38, 2.45),
+                       (x, 0.19, z), bevel_width=0.03, bevel_segments=2)
+        assign_material(base, mats["arch_deep"])
+        parts.append(base)
+        base2 = add_box(f"ENV_pil_base2_{tag}", (2.05, 0.28, 2.05),
+                        (x, 0.52, z), bevel_width=0.03, bevel_segments=2)
+        assign_material(base2, mats["arch_deep"])
+        parts.append(base2)
+        shaft_h = h - 1.4
+        shaft = add_cylinder(f"ENV_pil_shaft_{tag}", 0.85, shaft_h,
+                             (x, 0.66 + shaft_h * 0.5, z), vertices=10)
+        shaft.rotation_euler = (math.pi / 2.0, 0.0, 0.0)   # cylinder is +Z long
+        assign_material(shaft, mats["pillar"])
+        parts.append(shaft)
+        # fluting: four square ribs, which also keep the silhouette solid
+        for k in range(4):
+            a = math.pi * 0.5 * k + 0.4
+            rb = add_box(f"ENV_pil_rib_{tag}_{k}", (0.22, shaft_h * 0.98, 0.22),
+                         (x + math.cos(a) * 0.78, 0.66 + shaft_h * 0.5,
+                          z + math.sin(a) * 0.78), bevel_width=0.02)
+            assign_material(rb, mats["arch_deep"])
+            parts.append(rb)
+        if broken:
+            cap = add_cone(f"ENV_pil_snap_{tag}", 0.92, 0.34, 1.2,
+                           (x + rng.uniform(-0.12, 0.12), 0.66 + shaft_h + 0.45, z),
+                           rotation=(rng.uniform(-0.3, 0.3), 0.0,
+                                     rng.uniform(-0.3, 0.3)), vertices=7)
+            assign_material(cap, mats["pillar"])
+            parts.append(cap)
+        else:
+            nk = add_box(f"ENV_pil_neck_{tag}", (1.85, 0.26, 1.85),
+                         (x, 0.66 + shaft_h + 0.13, z), bevel_width=0.02)
+            assign_material(nk, mats["arch_deep"])
+            parts.append(nk)
+            cap = add_box(f"ENV_pil_cap_{tag}", (2.3, 0.6, 2.3),
+                          (x, 0.66 + shaft_h + 0.56, z),
+                          bevel_width=0.04, bevel_segments=2)
+            assign_material(cap, mats["pillar"])
+            parts.append(cap)
+            top = add_box(f"ENV_pil_abacus_{tag}", (1.95, 0.34, 1.95),
+                          (x, 0.66 + shaft_h + 1.03, z), bevel_width=0.03)
+            assign_material(top, mats["arch_deep"])
+            parts.append(top)
+            g = add_box(f"ENV_pil_glyph_{tag}", (0.36, 0.36, 0.09),
+                        (x, 0.66 + shaft_h + 0.56, z + 1.17))
+            assign_material(g, mats["glyph"])
+            parts.append(g)
+    print(f"ENV: {len(_pillar_slots())} colonnade pillars")
     return join_parts(parts, "ENV_pillars")
 
 
 # ------------------------------------------------------------ clouds -----
 
+def _puff(parts, mats, name, loc, size, rng, flat=(0.20, 0.42), mat="cloud"):
+    """One low-poly cloud lobe: an 80-triangle icosphere, squashed and
+    smooth-shaded. Cheap enough to use by the hundred."""
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.0, location=loc)
+    o = bpy.context.active_object
+    o.name = name
+    o.scale = (size, size * rng.uniform(*flat), size * rng.uniform(0.7, 1.35))
+    o.rotation_euler = (0.0, rng.uniform(0, 3.0), 0.0)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    bpy.ops.object.shade_smooth()
+    assign_material(o, mats[mat])
+    parts.append(o)
+    return o
+
+
 def _build_clouds(mats, rng):
-    """Cheap sea of cloud tops: one warm deck disc plus many squashed
-    low-poly blobs, dense near the island and sprawling to 250 m."""
+    """The sea of clouds.
+
+    Sight-line geometry drives the whole layout: the final camera sits at
+    y = 1.15 looking level, and the island itself (15-22 m of solid floor)
+    blocks every sight-line steeper than about 2.5 degrees down. So a
+    cloud sea parked at y = -30 would be literally invisible — only its
+    far edge, 700 m out, would clear the island's rim. Everything here is
+    therefore built so that what fills that narrow visible wedge is
+    modelled cloud: billows lapping the island's rim at r = 26-95 m, two
+    ranks of towers at 100-900 m whose tops rise to near eye level, flat
+    wisps striping the gaps, and a dull deep deck far below showing
+    between them for depth."""
+    parts = []
+
+    # --- deep deck: the floor of the sea, dull and warm, read in the gaps
     bm = bmesh.new()
     n_seg = 32
-    center = bm.verts.new((0.0, -34.0, 0.0))
+    center = bm.verts.new((0.0, -38.0, 0.0))
     ring = []
     for i in range(n_seg):
         a = 2.0 * math.pi * i / n_seg
-        ring.append(bm.verts.new((math.cos(a) * 620.0, -38.0, math.sin(a) * 620.0)))
+        ring.append(bm.verts.new((math.cos(a) * 950.0, -44.0, math.sin(a) * 950.0)))
     for i in range(n_seg):
         bm.faces.new([center, ring[i], ring[(i + 1) % n_seg]])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
@@ -684,69 +799,63 @@ def _build_clouds(mats, rng):
     deck = bpy.data.objects.new("ENV_cloud_deck", mesh)
     bpy.context.collection.objects.link(deck)
     assign_material(deck, mats["cloud_deck"])
+    parts.append(deck)
 
-    parts = [deck]
-    bands = ((36.0, 85.0, 70, 6.0, 15.0), (85.0, 170.0, 60, 12.0, 30.0),
-             (170.0, 320.0, 48, 22.0, 50.0), (320.0, 600.0, 42, 34.0, 80.0))
-    for bi, (r0, r1, count, s0, s1) in enumerate(bands):
+    # --- lower deck relief: big slow billows well below, mostly in shadow
+    for i in range(80):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(70.0, 880.0)
+        size = rng.uniform(26.0, 95.0) * (0.45 + r / 880.0)
+        _puff(parts, mats, f"ENV_cloud_low_{i}",
+              (math.cos(a) * r, rng.uniform(-34.0, -22.0), math.sin(a) * r),
+              size, rng, flat=(0.14, 0.30),
+              mat="cloud_shadow" if i % 3 else "cloud")
+
+    # --- billows lapping the island's rim: the layer that says "this rock
+    #     is floating IN something", seen just over the broken edge
+    for i in range(46):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(26.0, 95.0)
+        size = rng.uniform(7.0, 19.0)
+        top = rng.uniform(-3.4, 1.6) - 0.012 * r
+        for j in range(rng.randint(2, 4)):
+            bs = size * rng.uniform(0.5, 1.0)
+            _puff(parts, mats, f"ENV_cloud_rim_{i}_{j}",
+                  (math.cos(a) * r + rng.uniform(-size, size),
+                   top - j * bs * 0.34 - rng.uniform(0.0, 2.0),
+                   math.sin(a) * r + rng.uniform(-size, size)),
+                  bs, rng, flat=(0.24, 0.5),
+                  mat="cloud_lit" if j == 0 else "cloud")
+
+    # --- two ranks of towers climbing to near eye level, which is what
+    #     actually fills the frame behind and through the gate
+    for band, (r0, r1, count, s0, s1, t0, t1) in enumerate((
+            (100.0, 320.0, 54, 16.0, 52.0, -9.0, 2.5),
+            (320.0, 900.0, 46, 46.0, 130.0, -20.0, 5.0))):
         for i in range(count):
             a = rng.uniform(0, 2 * math.pi)
             r = rng.uniform(r0, r1)
-            sx = rng.uniform(s0, s1)
-            bpy.ops.mesh.primitive_ico_sphere_add(
-                subdivisions=2, radius=1.0,
-                location=(math.cos(a) * r,
-                          rng.uniform(-33.0, -21.0) + (bi * -1.5),
-                          math.sin(a) * r))
-            o = bpy.context.active_object
-            o.name = f"ENV_cloud_{bi}_{i}"
-            o.scale = (sx, sx * rng.uniform(0.16, 0.34), sx * rng.uniform(0.7, 1.4))
-            o.rotation_euler = (0.0, rng.uniform(0, 3.0), 0.0)
-            bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-            bpy.ops.object.shade_smooth()
-            assign_material(o, mats["cloud"])
-            parts.append(o)
-    # Distant cumulus towers. From the final camera (y = 1.15, near level)
-    # every sight-line steeper than about -2 degrees lands on the island
-    # itself, so a cloud sea that lives only at y = -30 would be invisible.
-    # These towers are rooted down in the deck but pile up to roughly the
-    # island's own height, so the horizon reads as a sea of cloud tops.
-    for i in range(46):
+            size = rng.uniform(s0, s1)
+            top = rng.uniform(t0, t1)
+            for j in range(rng.randint(2, 4)):
+                bs = size * rng.uniform(0.45, 1.0)
+                _puff(parts, mats, f"ENV_cloud_tower{band}_{i}_{j}",
+                      (math.cos(a) * r + rng.uniform(-size, size),
+                       top - j * bs * 0.28 - rng.uniform(0.0, 6.0),
+                       math.sin(a) * r + rng.uniform(-size, size)),
+                      bs, rng, flat=(0.22, 0.46),
+                      mat="cloud_lit" if j == 0 else "cloud")
+
+    # --- flat wisps: long thin streaks stacked through the horizon band,
+    #     the cheapest possible "layered sunset cloudscape" cue
+    for i in range(60):
         a = rng.uniform(0, 2 * math.pi)
-        r = rng.uniform(110.0, 560.0)
-        s = rng.uniform(22.0, 70.0) * (0.6 + r / 560.0)
-        top = rng.uniform(-9.0, 2.0)
-        for j in range(rng.randint(2, 4)):
-            bs = s * rng.uniform(0.45, 1.0)
-            bpy.ops.mesh.primitive_ico_sphere_add(
-                subdivisions=2, radius=1.0,
-                location=(math.cos(a) * r + rng.uniform(-s, s),
-                          top - j * bs * 0.30 - rng.uniform(0.0, 4.0),
-                          math.sin(a) * r + rng.uniform(-s, s)))
-            o = bpy.context.active_object
-            o.name = f"ENV_cloud_tower_{i}_{j}"
-            o.scale = (bs, bs * rng.uniform(0.22, 0.45), bs * rng.uniform(0.7, 1.3))
-            o.rotation_euler = (0.0, rng.uniform(0, 3.0), 0.0)
-            bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-            bpy.ops.object.shade_smooth()
-            assign_material(o, mats["cloud"])
-            parts.append(o)
-    # cloud tops lapping close around the island, read just below the rim
-    for i in range(34):
-        a = rng.uniform(0, 2 * math.pi)
-        r = _island_radius(a) + rng.uniform(3.0, 24.0)
-        s = rng.uniform(4.0, 11.0)
-        bpy.ops.mesh.primitive_ico_sphere_add(
-            subdivisions=2, radius=1.0,
-            location=(math.cos(a) * r, rng.uniform(-21.0, -13.5), math.sin(a) * r))
-        o = bpy.context.active_object
-        o.name = f"ENV_cloud_near_{i}"
-        o.scale = (s, s * rng.uniform(0.2, 0.4), s * rng.uniform(0.7, 1.3))
-        o.rotation_euler = (0.0, rng.uniform(0, 3.0), 0.0)
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-        bpy.ops.object.shade_smooth()
-        assign_material(o, mats["cloud"])
-        parts.append(o)
+        r = rng.uniform(90.0, 700.0)
+        size = rng.uniform(22.0, 90.0)
+        _puff(parts, mats, f"ENV_cloud_wisp_{i}",
+              (math.cos(a) * r, rng.uniform(-14.0, -1.0) - 0.004 * r, math.sin(a) * r),
+              size, rng, flat=(0.035, 0.09),
+              mat="cloud_lit" if i % 2 else "cloud")
     return join_parts(parts, "ENV_clouds")
 
 
