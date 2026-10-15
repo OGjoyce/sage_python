@@ -51,7 +51,16 @@ TIERS = {
     #            resolution     samples  volume step rate  motes
     "draft":   ((720, 405),      24,      4.0,             70),
     "preview": ((1280, 720),     80,      1.5,             160),
-    "final":   ((2560, 1440),    400,     0.6,             260),
+    # Sized to what this machine can actually deliver. Measured throughput is
+    # ~34k pixel-samples/sec on 4 CPU cores with no GPU, and this Blender is
+    # built WITHOUT OpenImageDenoise (verified: the denoiser enum is empty and
+    # enabling it raises "Build without OpenImageDenoiser"), so noise has to be
+    # bought with samples rather than cleaned up afterwards.
+    #
+    # The original 2560x1440 at 400 samples works out to ~1.47 billion
+    # pixel-samples, i.e. about 12 hours. 1920x1080 at 160 with adaptive
+    # sampling lands in roughly 1.5 hours for a far better noise/time trade.
+    "final":   ((1920, 1080),    160,     0.8,             260),
 }
 RESOLUTION, SAMPLES, VOL_STEP, MOTE_COUNT = TIERS[QUALITY]
 
@@ -98,12 +107,23 @@ PROP_SUBROOTS = {
     # occluded; and at 19 m it still sits ~2.8 m inside the left frame edge
     # instead of being clipped by it, which is what killed the two previous
     # placements.
-    # NOTE: props_fiend yaws the body 60 deg on its own PROP_fiend_body Empty
+    # Position chosen by ray-casting from the camera to the fiend's legs,
+    # torso and shoulder stump against the real assembled geometry, after
+    # three hand-estimated placements were all silently occluded. The
+    # blocker was never the pillars -- it was the ARCH, whose legs span
+    # x +/-8.1 (+/-6.9 after the shot refit), not the +/-3.4 the opening
+    # half-width suggested. Every earlier guess sat inside that.
+    #
+    # This one measures CLEAR at all three heights, sits 2.2 m inside the
+    # left frame edge, and lands 24.7 m from the lens -- which is also the
+    # "~25 m away" the original art direction asked for.
+    #
+    # props_fiend yaws the body 60 deg on its own PROP_fiend_body Empty
     # inside the group, because a stride along the view axis is invisible.
-    # This rotation ADDS to that, so the effective yaw is 75 deg -- a
-    # three-quarter profile that reads both the stride and the
-    # nothing-above-the-shoulders silhouette.
-    "fiend": {"loc": (-7.20, 0.0, -10.5), "rot_y": 15.0},
+    # This rotation ADDS to that, for an effective 75 deg: a three-quarter
+    # profile reading both the stride and the nothing-above-the-shoulders
+    # silhouette.
+    "fiend": {"loc": (-2.80, 0.0, -11.5), "rot_y": 15.0},
 }
 
 # Pulled back from the 7.2 m in CONVENTIONS.md: at 35 mm the Chaos Lord's
@@ -245,7 +265,14 @@ EMISSION_CEILING = {        # material-name prefix -> max strength after grade
     "ENV_shimmer": 0.55,
     "PROP_eye": 2.40,       # the head's last cyan flicker
     "CHAOS_crack": 1.30,    # cold lava veins
+    "CHAOS_eye": 2.20,      # authored at 14 -- would clip to flat white
+    "CHAOS_filigree": 1.10,
 }
+# Materials the grade must NOT touch. The aura wisps and embers are authored
+# faint on purpose (wisp 0.30); multiplying those by 0.26 puts them at 0.08
+# and they disappear from the frame entirely, taking the evil aura's
+# geometry component with them.
+EMISSION_EXEMPT = ("CHAOS_wisp", "CHAOS_ember")
 MODULE_TAGS = ("ENV_", "LYS_", "CHAOS_", "PROP_")
 
 
@@ -259,6 +286,8 @@ def grade_emission():
             continue
         sock = bsdf.inputs["Emission Strength"]
         if sock.is_linked or sock.default_value <= 0.0:
+            continue
+        if mat.name.startswith(EMISSION_EXEMPT):
             continue
         val = sock.default_value * EMISSION_GRADE
         for prefix, ceiling in EMISSION_CEILING.items():
@@ -372,7 +401,7 @@ cs.scene.add_area_light(
 # cold fill from camera-right-high so the ivory plate does not go to black
 cs.scene.add_area_light(
     (4.5, 4.2, 6.5), target=(-1.2, 1.5, 2.6),
-    energy=55.0, size=7.0, color=(0.62, 0.72, 0.95), name="FILL_sky")
+    energy=42.0, size=7.0, color=(0.76, 0.80, 0.93), name="FILL_sky")
 
 # Lys kicker. The key is behind-left by design, so her camera-facing side is
 # in shadow -- correct for a rim-lit silhouette, but it left the ivory plate
@@ -382,7 +411,7 @@ cs.scene.add_area_light(
 # without killing the rim.
 cs.scene.add_area_light(
     (-3.20, 0.85, 6.40), target=(-1.90, 1.25, 3.60),
-    energy=95.0, size=2.6, color=(1.00, 0.74, 0.46), name="LYS_kicker")
+    energy=300.0, size=2.6, color=(1.00, 0.76, 0.50), name="LYS_kicker")
 
 # Underloom read through the glass: a second, tighter hot source directly
 # beneath the two figures, so the orange-red hell-glow actually shows in the
@@ -403,8 +432,17 @@ cs.scene.add_area_light(
 # geometry at 16 m against a dark pillar. This rims it from behind-left so
 # it reads as a semi-silhouette with a lit edge, per the brief.
 cs.scene.add_area_light(
-    (-14.00, 4.20, -16.00), target=(-7.20, 1.40, -10.50),
-    energy=900.0, size=4.0, color=(1.00, 0.72, 0.42), name="FIEND_rim")
+    (-11.00, 4.40, -17.50), target=(-2.80, 1.40, -11.50),
+    energy=2600.0, size=4.0, color=(1.00, 0.72, 0.42), name="FIEND_rim")
+
+# A semi-silhouette still has to be legible. Backdrop probing put the fiend
+# against bright cloud, but the body itself was reading as an unidentifiable
+# dark smudge at 21 m. This is a soft frontal fill, deliberately weak enough
+# that the rim above still defines the edge, just strong enough that the
+# stride and the missing head are readable.
+cs.scene.add_area_light(
+    (-6.50, 2.60, -3.00), target=(-2.80, 1.30, -11.50),
+    energy=520.0, size=5.0, color=(1.00, 0.80, 0.62), name="FIEND_fill")
 
 # Cold accent on the severed head, so the cyan death-flicker separates it
 # from a floor that is lit warm orange from below. Small and close, kept
@@ -650,6 +688,15 @@ scene.cycles.volume_bounces = 1
 scene.cycles.transmission_bounces = 8 if QUALITY == "final" else 4
 scene.cycles.use_fast_gi = QUALITY != "final"
 scene.cycles.film_exposure = 0.55
+
+# Adaptive sampling concentrates samples on the noisy regions (volumetrics,
+# the glossy floor) and stops early on the clean ones. With no denoiser
+# available this is the only lever that buys quality without paying linearly
+# in time.
+scene.cycles.use_adaptive_sampling = True
+scene.cycles.adaptive_threshold = 0.010 if QUALITY == "final" else 0.025
+scene.cycles.adaptive_min_samples = 0          # 0 = let Cycles choose
+scene.cycles.use_light_tree = True             # ~14 lights in this shot
 
 # a touch of bloom-substitute: Cycles has no glare node, so the emissive
 # glyphs/cracks carry the glow on their own strength values.

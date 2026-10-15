@@ -781,25 +781,28 @@ def _build_legs(parts, mats, rng):
         surfs[side] = _Surf(pts, rad)
 
         foot = _tube(TAG + "foot_" + side,
-                     [(fx, 0.110, fz), (fx, 0.088, fz + zd * 0.12),
-                      (fx, 0.070, fz + zd * 0.22)],
-                     [(0.108, 0.122), (0.086, 0.130), (0.064, 0.116)], sides=8)
+                     [(fx, 0.092, fz), (fx, 0.070, fz + zd * 0.12),
+                      (fx, 0.052, fz + zd * 0.22)],
+                     # the foot tube runs horizontally, so its frame puts the
+                     # FIRST radius across X and the second vertically: a wide,
+                     # flat pad that sits exactly on the floor.
+                     [(0.122, 0.070), (0.132, 0.060), (0.118, 0.050)], sides=8)
         _mat(foot, skin)
         _smooth(foot, 2)
         parts.append(foot)
 
         for i, ox in enumerate((-0.098, 0.0, 0.098)):
             cl = _tube(f"{TAG}claw_{side}_{i}",
-                       [(fx + ox, 0.074, fz + zd * 0.20),
-                        (fx + ox * 1.25, 0.054, fz + zd * 0.33),
-                        (fx + ox * 1.45, 0.022, fz + zd * 0.45)],
+                       [(fx + ox, 0.056, fz + zd * 0.20),
+                        (fx + ox * 1.25, 0.036, fz + zd * 0.33),
+                        (fx + ox * 1.45, 0.008, fz + zd * 0.45)],
                        [0.050, 0.034, 0.004], sides=6)
             _mat(cl, mats["horn"])
             _smooth(cl, 2)
             parts.append(cl)
         sp = _tube(f"{TAG}spur_{side}",
-                   [(fx, 0.150, fz - zd * 0.04), (fx, 0.098, fz - zd * 0.17),
-                    (fx, 0.044, fz - zd * 0.28)],
+                   [(fx, 0.132, fz - zd * 0.04), (fx, 0.080, fz - zd * 0.17),
+                    (fx, 0.026, fz - zd * 0.28)],
                    [0.046, 0.029, 0.004], sides=6)
         _mat(sp, mats["horn"])
         _smooth(sp, 2)
