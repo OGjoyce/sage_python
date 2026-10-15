@@ -69,17 +69,17 @@ def _materials():
 
     M["horn"], _ = nm(TAG + "horn", base_color=(0.026, 0.034, 0.042, 1.0),
                       roughness=0.19, metallic=0.25)
-    M["armor"], _ = nm(TAG + "armor", base_color=(0.030, 0.037, 0.045, 1.0),
-                       roughness=0.23, metallic=0.62)
-    M["armor_hi"], _ = nm(TAG + "armor_hi", base_color=(0.072, 0.085, 0.098, 1.0),
-                          roughness=0.30, metallic=0.68)
-    M["axe"], _ = nm(TAG + "axe_iron", base_color=(0.034, 0.041, 0.049, 1.0),
-                     roughness=0.25, metallic=0.80)
-    M["axe_edge"], _ = nm(TAG + "axe_edge", base_color=(0.145, 0.158, 0.172, 1.0),
-                          roughness=0.16, metallic=0.95)
-    M["steel"], _ = nm(TAG + "steel", base_color=(0.265, 0.277, 0.295, 1.0),
-                       roughness=0.34, metallic=0.95)
-    M["bone"], _ = nm(TAG + "bone", base_color=(0.430, 0.418, 0.372, 1.0),
+    M["armor"], _ = nm(TAG + "armor", base_color=(0.028, 0.035, 0.043, 1.0),
+                       roughness=0.27, metallic=0.32)
+    M["armor_hi"], _ = nm(TAG + "armor_hi", base_color=(0.062, 0.074, 0.086, 1.0),
+                          roughness=0.31, metallic=0.38)
+    M["axe"], _ = nm(TAG + "axe_iron", base_color=(0.030, 0.037, 0.045, 1.0),
+                     roughness=0.30, metallic=0.45)
+    M["axe_edge"], _ = nm(TAG + "axe_edge", base_color=(0.190, 0.205, 0.220, 1.0),
+                          roughness=0.18, metallic=0.80)
+    M["steel"], _ = nm(TAG + "steel", base_color=(0.210, 0.222, 0.238, 1.0),
+                       roughness=0.38, metallic=0.75)
+    M["bone"], _ = nm(TAG + "bone", base_color=(0.545, 0.528, 0.470, 1.0),
                       roughness=0.44)
     M["cloth"], _ = nm(TAG + "cape_cloth", base_color=(0.018, 0.022, 0.026, 1.0),
                        roughness=0.56)
@@ -99,11 +99,16 @@ def _materials():
                      roughness=0.10, emission_color=TEAL_CRACK, emission_strength=14.0)
     M["ember"], _ = nm(TAG + "ember", base_color=(0.080, 0.022, 0.008, 1.0),
                        roughness=0.6, emission_color=UNDERLOOM, emission_strength=3.0)
+    # the geometric half of the "evil aura": torn wisps peeling off him.
+    # scene_main owns the volumetric half, so nothing here is a light.
+    M["wisp"], _ = nm(TAG + "wisp", base_color=(0.013, 0.030, 0.034, 1.0),
+                      roughness=0.88,
+                      emission_color=(0.040, 0.300, 0.325, 1.0), emission_strength=0.30)
 
     # black-teal ichor: wet and very glossy, barely self-lit so it reads as
     # dark fluid catching a teal highlight, not as glowing paint.
     M["ichor"], _ = nm(TAG + "ichor", base_color=ICHOR, roughness=0.035, metallic=0.20,
-                       emission_color=(0.020, 0.150, 0.160, 1.0), emission_strength=0.14)
+                       emission_color=(0.016, 0.110, 0.120, 1.0), emission_strength=0.05)
     return M
 
 
@@ -364,35 +369,69 @@ def _veins(out, name, surf, rng, mats, count, nseg=(4, 7), seg_len=0.10,
 
 
 # ================================================================ skeleton ===
-# Hunched predator.  The spine pitches ~30 deg forward out of a low pelvis,
-# the LEFT (+X) shoulder is shoved forward and high under the axe, the RIGHT
-# shoulder is dropped and pulled back, and the head is thrust forward so it
-# sits level with the shoulder tops.  Nothing here is mirrored.
+# Built to measured numbers, floor = Y 0, total height 3.00 m:
+#   floor -> hip            1.45      (long, heavy digitigrade legs)
+#   hip -> shoulder line    0.85      (shoulders 2.25 - 2.33)
+#   top of skull            2.62      (the HORNS are what reach 3.00)
+#   horn tips               ~3.00, swept back behind the skull
+#   shoulder width          ~1.25 overall
+#   fingertips of the free arm hang to ~0.95 (knee height)
+# The hunch is carried by the forward/raised LEFT shoulder (+X, the axe
+# shoulder, the side the scene rotation turns toward camera) against the
+# dropped and retracted RIGHT shoulder, plus a spine pitched ~19 deg forward
+# and a head thrust forward on a visible neck.
 
 SPINE = [
-    ((0.00, 1.44, -0.03), (0.235, 0.315)),   # waist           t = 0.00
-    ((0.01, 1.67, 0.10), (0.262, 0.355)),    # belly           t ~ 0.25
-    ((0.03, 1.89, 0.24), (0.300, 0.460)),    # lower chest     t ~ 0.49
-    ((0.05, 2.07, 0.34), (0.330, 0.580)),    # chest           t ~ 0.69
-    ((0.06, 2.20, 0.36), (0.320, 0.615)),    # shoulder shelf  t ~ 0.81
-    ((0.06, 2.30, 0.32), (0.285, 0.540)),    # trapezius       t ~ 0.91
-    ((0.05, 2.37, 0.26), (0.225, 0.355)),    # base of neck    t = 1.00
+    ((0.00, 1.45, 0.00), (0.175, 0.225)),    # waist          t = 0.00
+    ((0.01, 1.68, 0.09), (0.197, 0.258)),    # belly          t ~ 0.26
+    ((0.02, 1.90, 0.19), (0.226, 0.326)),    # lower chest    t ~ 0.52
+    ((0.04, 2.08, 0.27), (0.245, 0.376)),    # chest          t ~ 0.73
+    ((0.05, 2.21, 0.29), (0.238, 0.390)),    # shoulder shelf t ~ 0.87
+    ((0.05, 2.30, 0.26), (0.208, 0.330)),    # trapezius      t ~ 0.97
+    ((0.04, 2.36, 0.21), (0.163, 0.215)),    # base of neck   t = 1.00
 ]
 
-L_SH = Vector((0.645, 2.325, 0.395))    # LEFT shoulder: forward and high
-L_ELB = Vector((1.075, 1.780, 0.060))   # elbow kicked out and back
-L_WRI = Vector((0.800, 1.620, 0.720))   # hand up on the haft
+L_SH = Vector((0.385, 2.325, 0.395))    # LEFT shoulder: forward and raised
+L_ELB = Vector((0.610, 1.846, 0.072))
+L_WRI = Vector((0.550, 1.650, 0.550))   # gripping the haft in FRONT of the hip
 
-R_SH = Vector((-0.585, 2.090, -0.055))  # RIGHT shoulder: dropped and back
-R_ELB = Vector((-0.890, 1.500, 0.195))
-R_WRI = Vector((-0.640, 1.250, 0.860))  # low and forward: open palm-up beckon
+R_SH = Vector((-0.375, 2.185, 0.160))   # RIGHT shoulder: dropped and back
+R_ELB = Vector((-0.620, 1.630, 0.280))
+R_WRI = Vector((-0.820, 1.420, 0.680))  # free arm, low and swung out
 
-# ---- axe frame: grip, haft direction, blade spread, blade face normal ----
-AXE_G = Vector((0.800, 1.620, 0.720))
-AXE_D = Vector((-0.10, 0.90, -0.62)).normalized()
-AXE_T = AXE_G + AXE_D * 1.26
-AXE_O = Vector((0.96, -0.12, -0.33)).normalized()
-AXE_N = AXE_O.cross(AXE_D).normalized()
+HEAD_C = Vector((0.05, 2.46, 0.56))
+
+# ---- the axe -------------------------------------------------------------
+# A 2.2 m haft running diagonally across the chest from a butt down by the
+# forward knee up to a head sitting squarely ON the raised left shoulder.
+# The bit spreads almost straight out along +X, which puts the blade's broad
+# face within ~30 deg of the hero camera: a big flat axe silhouette, with the
+# haft a clear unbroken diagonal line across the body.
+AXE_T = Vector((0.440, 2.720, 0.140))                 # centre of the head
+AXE_D = Vector((-0.110, 1.070, -0.410)).normalized()  # butt -> head
+AXE_B = AXE_T - AXE_D * 2.20                          # butt, low and forward
+AXE_O = Vector((0.9946, 0.0752, -0.0706)).normalized()  # the bit spreads out
+AXE_N = AXE_O.cross(AXE_D).normalized()                 # broad face -> camera
+
+
+def _splash(out_list, name, surf, t, a, rt, ra, mats, rng, drip=0.0):
+    """A flat, wet, irregular ichor splash CONFORMING to the surface: two or
+    three overlapping thin surface patches, not a sphere stuck on the skin."""
+    for k in range(rng.randint(2, 3)):
+        tt = t + rng.uniform(-rt, rt) * 0.5
+        aa = a + rng.uniform(-ra, ra) * 0.5
+        dt = rt * rng.uniform(0.45, 1.0)
+        da = ra * rng.uniform(0.45, 1.0)
+        o = _shell(f"{name}_{k}", surf, tt - dt, tt + dt, aa - da, aa + da,
+                   gap0=0.004, gap1=0.004, thick=0.008, nt=2, na=3, bevel=0.0)
+        _mat(o, mats["ichor"])
+        out_list.append(o)
+    if drip > 0.0:
+        pts = [surf.at(t - k * drip * 0.42, a + k * 0.02, gap=0.010)[0] for k in range(3)]
+        d = _tube(f"{name}_run", pts, [0.016, 0.012, 0.003], sides=6)
+        _mat(d, mats["ichor"])
+        _smooth(d, 1)
+        out_list.append(d)
 
 
 # ============================================================ body masses ===
@@ -406,182 +445,186 @@ def _build_body(parts, glow, mats, rng):
     parts.append(torso)
     torso_surf = _Surf([p for p, _ in SPINE], [r for _, r in SPINE])
 
-    # rounded hunch across the shoulder blades: the coiled back
+    # rounded hunch across the shoulder blades
     hunch = _tube(TAG + "hunch",
-                  [(-0.42, 2.00, 0.00), (-0.14, 2.24, -0.06), (0.20, 2.35, -0.02),
-                   (0.54, 2.30, 0.14)],
-                  [(0.16, 0.19), (0.25, 0.28), (0.27, 0.30), (0.21, 0.24)], sides=8)
+                  [(-0.30, 2.02, 0.02), (-0.10, 2.22, -0.03), (0.14, 2.32, 0.00),
+                   (0.36, 2.30, 0.12)],
+                  [(0.120, 0.140), (0.175, 0.200), (0.190, 0.212), (0.150, 0.172)],
+                  sides=8)
     _mat(hunch, skin)
     _smooth(hunch, 2)
     parts.append(hunch)
 
-    # pectoral slabs, placed on the real chest surface (left one driven
-    # forward with the shoulder)
-    for side, t_c, a_c, w in (("l", 0.68, 0.52, 0.42), ("r", 0.62, -0.50, 0.38)):
-        p0, _ = torso_surf.at(t_c + 0.09, a_c - w * 0.5, gap=-0.07)
-        p1, _ = torso_surf.at(t_c, a_c, gap=0.01)
-        p2, _ = torso_surf.at(t_c - 0.10, a_c + w * 0.5, gap=-0.07)
+    for side, t_c, a_c, w in (("l", 0.74, 0.50, 0.40), ("r", 0.67, -0.48, 0.36)):
+        p0, _ = torso_surf.at(t_c + 0.08, a_c - w * 0.5, gap=-0.055)
+        p1, _ = torso_surf.at(t_c, a_c, gap=0.008)
+        p2, _ = torso_surf.at(t_c - 0.09, a_c + w * 0.5, gap=-0.055)
         pec = _tube(TAG + "pec_" + side, [p0, p1, p2],
-                    [(0.070, 0.110), (0.140, 0.180), (0.070, 0.105)], sides=8)
+                    [(0.050, 0.080), (0.100, 0.130), (0.050, 0.076)], sides=8)
         _mat(pec, skin)
         _smooth(pec, 2)
         parts.append(pec)
 
-    # abdominal wall
-    ab = [torso_surf.at(t, 0.0, gap=-0.09)[0] for t in (0.20, 0.34, 0.48)]
+    ab = [torso_surf.at(t, 0.0, gap=-0.065)[0] for t in (0.18, 0.34, 0.50)]
     abdo = _tube(TAG + "abs", ab,
-                 [(0.100, 0.225), (0.120, 0.265), (0.120, 0.250)], sides=8)
+                 [(0.070, 0.160), (0.085, 0.190), (0.085, 0.180)], sides=8)
     _mat(abdo, skin)
     _smooth(abdo, 2)
     parts.append(abdo)
 
     pelvis = _tube(TAG + "pelvis",
-                   [(0.00, 1.22, -0.07), (0.00, 1.38, -0.02), (0.00, 1.52, 0.00)],
-                   [(0.235, 0.355), (0.285, 0.430), (0.250, 0.350)], sides=12)
+                   [(0.00, 1.21, -0.04), (0.00, 1.34, -0.01), (0.00, 1.49, 0.01)],
+                   [(0.180, 0.255), (0.205, 0.300), (0.180, 0.245)], sides=12)
     _mat(pelvis, skin)
     _smooth(pelvis, 2)
     parts.append(pelvis)
 
-    # ---- thick neck + head, thrust forward ------------------------------
-    neck = _tube(TAG + "neck",
-                 [(0.05, 2.26, 0.20), (0.055, 2.36, 0.38), (0.06, 2.44, 0.55)],
-                 [(0.215, 0.235), (0.195, 0.212), (0.168, 0.184)], sides=8)
+    # ---- visible, thick neck carrying the head forward ------------------
+    nk_pts = [(0.045, 2.25, 0.18), (0.050, 2.31, 0.33), (0.050, 2.345, 0.47)]
+    nk_rad = [(0.150, 0.165), (0.140, 0.152), (0.126, 0.138)]
+    neck = _tube(TAG + "neck", nk_pts, nk_rad, sides=8)
     _mat(neck, skin)
     _smooth(neck, 2)
     parts.append(neck)
+    neck_surf = _Surf(nk_pts, nk_rad)
 
-    skull = _tube(TAG + "skull",
-                  [(0.06, 2.355, 0.490), (0.06, 2.455, 0.600), (0.06, 2.575, 0.645),
-                   (0.06, 2.675, 0.585), (0.06, 2.730, 0.465)],
-                  [(0.170, 0.165), (0.235, 0.215), (0.255, 0.225),
-                   (0.215, 0.185), (0.125, 0.100)], sides=10)
+    # ---- head: top of skull lands at 2.62 -------------------------------
+    sk_pts = [(0.05, 2.300, 0.455), (0.05, 2.390, 0.545), (0.05, 2.490, 0.575),
+              (0.05, 2.575, 0.525), (0.05, 2.612, 0.435)]
+    sk_rad = [(0.125, 0.120), (0.172, 0.160), (0.185, 0.168),
+              (0.155, 0.135), (0.085, 0.070)]
+    skull = _tube(TAG + "skull", sk_pts, sk_rad, sides=10)
     _mat(skull, skin)
     _smooth(skull, 2)
     parts.append(skull)
+    skull_surf = _Surf(sk_pts, sk_rad)
 
-    muzzle = _tube(TAG + "muzzle",
-                   [(0.06, 2.540, 0.630), (0.06, 2.490, 0.790), (0.06, 2.448, 0.910)],
-                   [(0.135, 0.170), (0.105, 0.145), (0.070, 0.100)], sides=8)
+    # a long demonic snout, well clear of the skull mass
+    mz_pts = [(0.05, 2.470, 0.545), (0.05, 2.440, 0.700),
+              (0.05, 2.412, 0.830), (0.05, 2.392, 0.935)]
+    muzzle = _tube(TAG + "muzzle", mz_pts,
+                   [(0.105, 0.132), (0.082, 0.108), (0.062, 0.084),
+                    (0.040, 0.055)], sides=8)
     _mat(muzzle, skin)
     _smooth(muzzle, 2)
     parts.append(muzzle)
+    muzzle_surf = _Surf(mz_pts, [(0.105, 0.132), (0.082, 0.108),
+                                 (0.062, 0.084), (0.040, 0.055)])
+    for sx in (-1, 1):
+        nos = _blob(f"{TAG}nostril_{sx}", (0.05 + sx * 0.040, 2.408, 0.905),
+                    (0.018, 0.015, 0.022), subdiv=2)
+        _mat(nos, mats["mouth"])
+        parts.append(nos)
 
+    # the jaw hangs open a crack -- that gap is what makes the fangs read
     jaw = _tube(TAG + "jaw",
-                [(0.06, 2.435, 0.570), (0.06, 2.395, 0.750), (0.06, 2.380, 0.890)],
-                [(0.085, 0.160), (0.070, 0.135), (0.048, 0.092)], sides=8)
+                [(0.05, 2.352, 0.490), (0.05, 2.312, 0.650),
+                 (0.05, 2.292, 0.790), (0.05, 2.286, 0.890)],
+                [(0.068, 0.124), (0.058, 0.108), (0.044, 0.082),
+                 (0.030, 0.056)], sides=8)
     _mat(jaw, skin)
     _smooth(jaw, 2)
     parts.append(jaw)
+    # a thin dark mouth line tilted UP on his left: the bored half-smile
+    maw_slit = add_box(TAG + "maw_slit", (0.235, 0.030, 0.165), (0.055, 2.344, 0.800),
+                       rotation=(0.22, 0.0, 0.17), bevel_width=0.006)
+    _mat(maw_slit, mats["mouth"])
+    parts.append(maw_slit)
+    for sx in (-1, 1):
+        cheek = _tube(f"{TAG}cheek_{sx}",
+                      [(0.05 + sx * 0.120, 2.455, 0.560),
+                       (0.05 + sx * 0.140, 2.405, 0.680),
+                       (0.05 + sx * 0.120, 2.370, 0.780)],
+                      [0.055, 0.044, 0.028], sides=6)
+        _mat(cheek, skin)
+        _smooth(cheek, 2)
+        parts.append(cheek)
 
-    # heavy brow ridges, slanted down toward the nose: contemptuous
     for side, sx in (("l", 1.0), ("r", -1.0)):
-        brow = add_box(TAG + "brow_" + side, (0.23, 0.065, 0.16),
-                       (0.06 + sx * 0.150, 2.632, 0.790),
-                       rotation=(0.24, 0.0, sx * -0.34), bevel_width=0.015, bevel_segments=2)
+        brow = add_box(TAG + "brow_" + side, (0.185, 0.058, 0.125),
+                       (0.05 + sx * 0.112, 2.552, 0.700),
+                       rotation=(0.24, 0.0, sx * -0.36), bevel_width=0.014, bevel_segments=2)
         _mat(brow, skin)
         parts.append(brow)
-
-    # solid pupil-less glowing cyan eyes
-    for side, sx in (("l", 1.0), ("r", -1.0)):
-        socket = add_box(TAG + "socket_" + side, (0.23, 0.11, 0.06),
-                         (0.06 + sx * 0.145, 2.558, 0.820),
-                         rotation=(0.1, 0.0, sx * -0.30), bevel_width=0.010)
+        socket = add_box(TAG + "socket_" + side, (0.175, 0.090, 0.050),
+                         (0.05 + sx * 0.108, 2.487, 0.718),
+                         rotation=(0.1, 0.0, sx * -0.32), bevel_width=0.008)
         _mat(socket, mats["mouth"])
         parts.append(socket)
-        eye = _blob(TAG + "eye_" + side, (0.06 + sx * 0.142, 2.562, 0.830),
-                    (0.092, 0.050, 0.058), rot=(0.0, 0.0, sx * -0.30), subdiv=3)
+        eye = _blob(TAG + "eye_" + side, (0.05 + sx * 0.106, 2.490, 0.730),
+                    (0.074, 0.040, 0.046), rot=(0.0, 0.0, sx * -0.32), subdiv=3)
         _mat(eye, mats["eye"])
         glow.append(eye)
 
-    # ---- bored half-smile: the mouth line lifts on his LEFT only --------
-    maw = add_box(TAG + "maw", (0.34, 0.034, 0.060), (0.065, 2.403, 0.902),
-                  rotation=(0.0, 0.0, 0.18), bevel_width=0.006)
+    # ---- bored half-smile: the mouth lifts on his LEFT (+X) only --------
+    maw = add_box(TAG + "maw", (0.25, 0.026, 0.045), (0.055, 2.352, 0.790),
+                  rotation=(0.0, 0.0, 0.18), bevel_width=0.005)
     _mat(maw, mats["mouth"])
     parts.append(maw)
-    curl = add_box(TAG + "maw_curl", (0.13, 0.030, 0.052), (0.235, 2.447, 0.848),
-                   rotation=(0.0, -0.45, 0.55), bevel_width=0.006)
+    curl = add_box(TAG + "maw_curl", (0.095, 0.023, 0.038), (0.173, 2.385, 0.748),
+                   rotation=(0.0, -0.45, 0.55), bevel_width=0.005)
     _mat(curl, mats["mouth"])
     parts.append(curl)
 
-    for i, (lx, ln) in enumerate([(-0.115, 0.050), (-0.045, 0.058), (0.030, 0.066),
-                                  (0.105, 0.084), (0.175, 0.100), (0.235, 0.074)]):
-        x, y = 0.065 + lx, 2.395 + lx * 0.180
+    # Tusk-like teeth.  The two big outer tusks stand clear of the lip and
+    # are what make the mouth read at distance; the inner fangs fill it in.
+    # Everything is lifted on his LEFT (+X) by the half-smile's tilt.
+    for i, (lx, lz, ln, rr) in enumerate([(-0.112, 0.690, 0.105, 0.028),
+                                          (-0.052, 0.770, 0.062, 0.019),
+                                          (0.014, 0.812, 0.070, 0.020),
+                                          (0.082, 0.800, 0.090, 0.022),
+                                          (0.142, 0.740, 0.130, 0.030),
+                                          (0.186, 0.660, 0.082, 0.021)]):
+        x, y = 0.055 + lx, 2.302 + lx * 0.195
         t = _tube(f"{TAG}tooth_lo_{i}",
-                  [(x, y - 0.014, 0.900), (x, y + ln * 0.6, 0.896), (x, y + ln, 0.888)],
-                  [0.019, 0.013, 0.003], sides=6)
+                  [(x, y - 0.015, lz), (x + lx * 0.10, y + ln * 0.55, lz + 0.004),
+                   (x + lx * 0.18, y + ln, lz + 0.006)],
+                  [rr, rr * 0.66, 0.002], sides=6)
         _mat(t, mats["bone"])
         _smooth(t, 1)
         parts.append(t)
-    for i, (lx, ln) in enumerate([(-0.070, 0.046), (0.055, 0.052), (0.150, 0.060)]):
-        x, y = 0.065 + lx, 2.415 + lx * 0.180
+    for i, (lx, lz, ln, rr) in enumerate([(-0.078, 0.745, 0.062, 0.021),
+                                          (0.016, 0.812, 0.056, 0.018),
+                                          (0.108, 0.775, 0.074, 0.023)]):
+        x, y = 0.055 + lx, 2.396 + lx * 0.195
         t = _tube(f"{TAG}tooth_up_{i}",
-                  [(x, y + 0.014, 0.894), (x, y - ln * 0.6, 0.890), (x, y - ln, 0.882)],
-                  [0.016, 0.011, 0.002], sides=6)
+                  [(x, y + 0.012, lz), (x, y - ln * 0.55, lz + 0.002),
+                   (x, y - ln, lz + 0.004)],
+                  [rr, rr * 0.62, 0.002], sides=6)
         _mat(t, mats["bone"])
         _smooth(t, 1)
         parts.append(t)
 
-    for i, (sx, px, py, pz, ln) in enumerate([(1, 0.215, 2.505, 0.730, 0.13),
-                                              (-1, -0.100, 2.490, 0.720, 0.11),
-                                              (1, 0.200, 2.415, 0.640, 0.10),
-                                              (-1, -0.090, 2.405, 0.630, 0.09)]):
-        sp = _tube(f"{TAG}cheekspur_{i}",
-                   [(px, py, pz),
-                    (px + sx * ln * 0.55, py + ln * 0.45, pz - ln * 0.55),
-                    (px + sx * ln, py + ln * 0.85, pz - ln * 1.1)],
-                   [0.034, 0.020, 0.003], sides=6)
-        _mat(sp, mats["horn"])
-        _smooth(sp, 1)
-        parts.append(sp)
-
-    # ---- long swept-back horns: the major silhouette element ------------
-    # They clear the shoulder line (top ~2.55) and peak at ~2.99.
+    # ---- the two long swept-back horns ----------------------------------
+    # Base thick at the temple, tapering to a tip ~3.00 high and ~0.85 m
+    # behind the skull: the primary silhouette element, read against sky.
     horn_surfs = []
-    for side, sx, st in (("l", 1.0, 1.0), ("r", -1.0, 0.93)):
+    for side, sx, st in (("l", 1.0, 1.0), ("r", -1.0, 0.95)):
         pts = [
-            (0.06 + sx * 0.190, 2.615, 0.550),
-            (0.06 + sx * 0.295, 2.790, 0.380),
-            (0.06 + sx * 0.370, 2.915, 0.105),
-            (0.06 + sx * 0.420, 2.992, -0.210 * st),
-            (0.06 + sx * 0.440, 2.975, -0.540 * st),
-            (0.06 + sx * 0.420, 2.878, -0.845 * st),
-            (0.06 + sx * 0.375, 2.730, -1.100 * st),
+            (0.05 + sx * 0.150, 2.520, 0.420),
+            (0.05 + sx * 0.215, 2.605, 0.245),
+            (0.05 + sx * 0.265, 2.712, 0.040),
+            (0.05 + sx * 0.300, 2.822, -0.165 * st),
+            (0.05 + sx * 0.322, 2.915, -0.345 * st),
+            (0.05 + sx * 0.335, 2.975, -0.510 * st),
+            (0.05 + sx * 0.340, 3.000, -0.655 * st),
         ]
-        rad = [0.165, 0.152, 0.131, 0.106, 0.077, 0.046, 0.010]
+        rad = [0.128, 0.114, 0.096, 0.076, 0.054, 0.031, 0.008]
         horn = _tube(TAG + "horn_" + side, pts, rad, sides=8)
         _mat(horn, mats["horn"])
         _smooth(horn, 2)
         parts.append(horn)
-        hs = _Surf(pts, rad)
-        horn_surfs.append(hs)
+        horn_surfs.append(_Surf(pts, rad))
 
-        for k in range(6):
-            c, _ = hs.at(0.10 + k * 0.105, 0.0)
-            r = 0.160 - 0.020 * k
-            ring = _tube(f"{TAG}hornring_{side}_{k}",
-                         [c + Vector((0, 0.016, 0.014)), c - Vector((0, 0.016, 0.014))],
-                         [r, r], sides=8)
-            _mat(ring, mats["horn"])
-            parts.append(ring)
-
-        bh = _tube(f"{TAG}browhorn_{side}",
-                   [(0.06 + sx * 0.095, 2.662, 0.680),
-                    (0.06 + sx * 0.130, 2.748, 0.575),
-                    (0.06 + sx * 0.150, 2.810, 0.450)],
-                   [0.046, 0.027, 0.004], sides=6)
-        _mat(bh, mats["horn"])
-        _smooth(bh, 1)
-        parts.append(bh)
-
-    return torso_surf, horn_surfs
+    return torso_surf, horn_surfs, [skull_surf, muzzle_surf, neck_surf]
 
 
 # ===================================================================== arms ===
 
 def _arm_chain(sh, elb, wri, r_sh, r_elb, r_wri, bulge):
-    """One continuous polyline shoulder -> elbow -> wrist, with extra points
+    """One continuous polyline shoulder -> elbow -> wrist, with points
     bracketing the elbow so subdivision keeps the joint instead of melting
-    it, plus a biceps / forearm bulge between them."""
+    it, plus a biceps / forearm bulge."""
     d1, d2 = (elb - sh), (wri - elb)
     pts = [sh,
            sh + d1 * 0.30 + bulge * 0.55,
@@ -594,12 +637,12 @@ def _arm_chain(sh, elb, wri, r_sh, r_elb, r_wri, bulge):
            wri]
     rad = [r_sh,
            (r_sh[0] * 1.00, r_sh[1] * 0.98),
-           (r_sh[0] * 0.88, r_sh[1] * 0.88),
+           (r_sh[0] * 0.84, r_sh[1] * 0.84),
            (r_elb[0] * 1.06, r_elb[1] * 1.04),
            r_elb,
            (r_elb[0] * 1.05, r_elb[1] * 1.03),
-           (r_elb[0] * 0.98, r_elb[1] * 0.96),
-           (r_wri[0] * 1.10, r_wri[1] * 1.08),
+           (r_elb[0] * 0.96, r_elb[1] * 0.94),
+           (r_wri[0] * 1.12, r_wri[1] * 1.10),
            r_wri]
     return pts, rad
 
@@ -609,94 +652,93 @@ def _build_arms(parts, mats, rng):
     surfs = {}
 
     for side, sh, elb, wri, bulge in (
-            ("l", L_SH, L_ELB, L_WRI, Vector((0.055, 0.0, 0.045))),
-            ("r", R_SH, R_ELB, R_WRI, Vector((-0.055, 0.0, 0.045)))):
-        rsh = (0.258, 0.284) if side == "l" else (0.240, 0.262)
-        pts, rad = _arm_chain(sh, elb, wri, rsh, (0.160, 0.170), (0.108, 0.116), bulge)
+            ("l", L_SH, L_ELB, L_WRI, Vector((0.050, 0.0, 0.040))),
+            ("r", R_SH, R_ELB, R_WRI, Vector((-0.050, 0.0, 0.040)))):
+        rsh = (0.190, 0.200) if side == "l" else (0.180, 0.190)
+        pts, rad = _arm_chain(sh, elb, wri, rsh, (0.124, 0.132), (0.082, 0.089), bulge)
         arm = _tube(TAG + "arm_" + side, pts, rad, sides=10)
         _mat(arm, skin)
         _smooth(arm, 2)
         parts.append(arm)
         surfs[side] = _Surf(pts, rad)
 
-        # trapezius / deltoid wedge tying the arm into the torso
-        inward = -0.20 if side == "l" else 0.20
+        inward = -0.15 if side == "l" else 0.15
         tie = _tube(TAG + "delt_" + side,
-                    [sh + Vector((inward, 0.06, -0.06)),
-                     sh + Vector((0.0, 0.03, 0.0)),
-                     sh + Vector((-inward * 0.7, -0.10, 0.02))],
-                    [(0.195, 0.165), (0.252, 0.238), (0.218, 0.208)], sides=8)
+                    [sh + Vector((inward, 0.05, -0.05)),
+                     sh + Vector((0.0, 0.025, 0.0)),
+                     sh + Vector((-inward * 0.7, -0.09, 0.02))],
+                    [(0.140, 0.122), (0.182, 0.172), (0.158, 0.150)], sides=8)
         _mat(tie, skin)
         _smooth(tie, 2)
         parts.append(tie)
 
-    # ---- LEFT hand: fist wrapped around the axe haft --------------------
+    # ---- LEFT hand: fist closed around the haft -------------------------
     d, o, n = AXE_D, AXE_O, AXE_N
-    gp = AXE_G
-    palm = _tube(TAG + "hand_l",
-                 [gp - d * 0.115 - n * 0.02, gp, gp + d * 0.115 - n * 0.01],
-                 [(0.090, 0.095), (0.125, 0.135), (0.090, 0.098)], sides=8)
+    gp = L_WRI
+    palm = _tube(TAG + "hand_l", [gp - d * 0.095 - n * 0.015, gp, gp + d * 0.095 - n * 0.01],
+                 [(0.072, 0.076), (0.098, 0.106), (0.072, 0.078)], sides=8)
     _mat(palm, skin)
     _smooth(palm, 2)
     parts.append(palm)
     for i in range(4):
-        base = gp + d * (-0.090 + i * 0.062) - n * 0.090
+        base = gp + d * (-0.072 + i * 0.050) - n * 0.072
         f = _tube(f"{TAG}fing_l_{i}",
-                  [base, base + n * 0.095 + o * 0.095, base + n * 0.195 + o * 0.030],
-                  [0.039, 0.033, 0.022], sides=6)
+                  [base, base + n * 0.078 + o * 0.078, base + n * 0.158 + o * 0.024],
+                  [0.032, 0.027, 0.018], sides=6)
         _mat(f, skin)
         _smooth(f, 2)
         parts.append(f)
     thumb = _tube(TAG + "thumb_l",
-                  [gp + d * 0.090 + n * 0.065, gp + d * 0.035 + n * 0.145,
-                   gp - d * 0.035 + n * 0.168],
-                  [0.045, 0.036, 0.023], sides=6)
+                  [gp + d * 0.072 + n * 0.052, gp + d * 0.028 + n * 0.118,
+                   gp - d * 0.028 + n * 0.136],
+                  [0.036, 0.029, 0.018], sides=6)
     _mat(thumb, skin)
     _smooth(thumb, 2)
     parts.append(thumb)
 
-    # ---- RIGHT hand: wide, open, palm up, lazy beckon -------------------
-    pc = Vector((-0.620, 1.238, 0.995))
+    # ---- RIGHT hand: open, palm UP, lazy beckon -------------------------
+    # Held out away from the body at waist height so it reads in profile.
+    pc = Vector((-0.880, 1.408, 0.815))
     palm_r = _tube(TAG + "hand_r",
-                   [pc - Vector((0.0, 0.0, 0.140)), pc - Vector((0.0, 0.006, 0.020)),
-                    pc + Vector((0.012, 0.000, 0.110))],
-                   [(0.105, 0.052), (0.172, 0.050), (0.182, 0.044)], sides=10,
+                   [pc - Vector((0.010, 0.0, 0.120)), pc - Vector((0.0, 0.006, 0.015)),
+                    pc + Vector((0.014, 0.000, 0.098))],
+                   [(0.090, 0.044), (0.150, 0.042), (0.158, 0.038)], sides=10,
                    ref=(0.0, 1.0, 0.0))
     _mat(palm_r, skin)
     _smooth(palm_r, 2)
     parts.append(palm_r)
-    heel = _blob(TAG + "palmheel_r", tuple(pc - Vector((0.0, 0.020, 0.115))),
-                 (0.142, 0.062, 0.100), subdiv=2)
+    heel = _blob(TAG + "palmheel_r", tuple(pc - Vector((0.010, 0.018, 0.100))),
+                 (0.124, 0.054, 0.086), subdiv=2)
     _mat(heel, skin)
     _smooth(heel, 1)
     parts.append(heel)
 
     for i in range(4):
-        fx = -0.138 + i * 0.092
-        spread = 0.072 * (i - 1.5) / 1.5
-        b = pc + Vector((fx, 0.000, 0.112))
-        m = b + Vector((spread * 0.8, 0.012, 0.148))
-        t = m + Vector((spread * 1.0, 0.064, 0.118))
+        fx = -0.120 + i * 0.080
+        spread = 0.064 * (i - 1.5) / 1.5
+        b = pc + Vector((fx, 0.004, 0.100))
+        m = b + Vector((spread * 0.8, 0.036, 0.138))
+        t = m + Vector((spread * 1.0, 0.105, 0.078))
         f = _tube(f"{TAG}fing_r_{i}", [b, m, t],
-                  [0.045 - 0.004 * abs(i - 1.5), 0.038, 0.024], sides=6)
+                  [0.040 - 0.003 * abs(i - 1.5), 0.034, 0.021], sides=6)
         _mat(f, skin)
         _smooth(f, 2)
         parts.append(f)
-        cl = _tube(f"{TAG}fclaw_r_{i}", [t, t + Vector((spread * 0.3, 0.046, 0.042))],
-                   [0.019, 0.002], sides=6)
+        cl = _tube(f"{TAG}fclaw_r_{i}", [t, t + Vector((spread * 0.3, 0.056, 0.018))],
+                   [0.017, 0.002], sides=6)
         _mat(cl, mats["horn"])
         _smooth(cl, 1)
         parts.append(cl)
     th = _tube(TAG + "thumb_r",
-               [pc + Vector((0.142, -0.010, -0.050)), pc + Vector((0.244, 0.010, 0.040)),
-                pc + Vector((0.294, 0.046, 0.118))],
-               [0.050, 0.039, 0.024], sides=6)
+               [pc + Vector((0.126, -0.006, -0.044)), pc + Vector((0.222, 0.030, 0.034)),
+                pc + Vector((0.268, 0.090, 0.096))],
+               [0.045, 0.035, 0.021], sides=6)
     _mat(th, skin)
     _smooth(th, 2)
     parts.append(th)
     thc = _tube(TAG + "thumbclaw_r",
-                [pc + Vector((0.294, 0.046, 0.118)), pc + Vector((0.326, 0.082, 0.158))],
-                [0.020, 0.002], sides=6)
+                [pc + Vector((0.268, 0.090, 0.096)), pc + Vector((0.294, 0.132, 0.118))],
+                [0.018, 0.002], sides=6)
     _mat(thc, mats["horn"])
     _smooth(thc, 1)
     parts.append(thc)
@@ -705,29 +747,29 @@ def _build_arms(parts, mats, rng):
 
 
 # ===================================================================== legs ===
+# Floor -> hip 1.45.  Knee ~0.95, digitigrade heel ~0.44, toes on the floor.
 
 LEGS = {
-    "l": ([(0.310, 1.520, 0.100), (0.360, 1.280, 0.200), (0.420, 1.040, 0.305),
-           (0.452, 0.925, 0.340), (0.455, 0.835, 0.295), (0.440, 0.660, 0.150),
-           (0.418, 0.510, 0.010), (0.425, 0.390, 0.080), (0.435, 0.245, 0.215),
-           (0.445, 0.148, 0.320)],
-          [(0.300, 0.315), (0.292, 0.300), (0.230, 0.235), (0.218, 0.222),
-           (0.198, 0.202), (0.180, 0.185), (0.142, 0.150), (0.126, 0.138),
-           (0.130, 0.150), (0.142, 0.158)],
-          (0.445, 0.320, 1.0)),
-    "r": ([(-0.330, 1.500, 0.010), (-0.415, 1.265, 0.025), (-0.510, 1.030, 0.030),
-           (-0.545, 0.915, 0.010), (-0.552, 0.825, -0.055), (-0.560, 0.650, -0.215),
-           (-0.568, 0.505, -0.370), (-0.562, 0.388, -0.305), (-0.550, 0.245, -0.175),
-           (-0.542, 0.148, -0.075)],
-          [(0.300, 0.315), (0.292, 0.300), (0.230, 0.235), (0.218, 0.222),
-           (0.198, 0.202), (0.180, 0.185), (0.142, 0.150), (0.126, 0.138),
-           (0.130, 0.150), (0.142, 0.158)],
-          (-0.542, -0.075, -1.0)),
+    "l": ([(0.235, 1.470, 0.070), (0.265, 1.220, 0.160), (0.300, 0.970, 0.260),
+           (0.310, 0.880, 0.250), (0.305, 0.740, 0.160), (0.295, 0.560, 0.020),
+           (0.290, 0.440, -0.020), (0.293, 0.300, 0.060), (0.298, 0.180, 0.180),
+           (0.302, 0.112, 0.280)],
+          [(0.225, 0.238), (0.215, 0.224), (0.165, 0.172), (0.155, 0.160),
+           (0.142, 0.148), (0.118, 0.124), (0.100, 0.108), (0.096, 0.106),
+           (0.100, 0.115), (0.108, 0.122)],
+          (0.302, 0.280, 1.0)),
+    "r": ([(-0.245, 1.450, -0.010), (-0.300, 1.200, -0.010), (-0.355, 0.950, 0.000),
+           (-0.368, 0.860, -0.030), (-0.372, 0.720, -0.120), (-0.378, 0.550, -0.270),
+           (-0.382, 0.430, -0.370), (-0.378, 0.300, -0.310), (-0.372, 0.180, -0.200),
+           (-0.368, 0.112, -0.110)],
+          [(0.225, 0.238), (0.215, 0.224), (0.165, 0.172), (0.155, 0.160),
+           (0.142, 0.148), (0.118, 0.124), (0.100, 0.108), (0.096, 0.106),
+           (0.100, 0.115), (0.108, 0.122)],
+          (-0.368, -0.110, -1.0)),
 }
 
 
 def _build_legs(parts, mats, rng):
-    """Massive digitigrade legs, one planted forward and one braced back."""
     skin = mats["skin"]
     surfs = {}
 
@@ -739,26 +781,26 @@ def _build_legs(parts, mats, rng):
         surfs[side] = _Surf(pts, rad)
 
         foot = _tube(TAG + "foot_" + side,
-                     [(fx, 0.145, fz), (fx, 0.110, fz + zd * 0.14),
-                      (fx, 0.086, fz + zd * 0.26)],
-                     [(0.142, 0.158), (0.112, 0.168), (0.082, 0.150)], sides=8)
+                     [(fx, 0.110, fz), (fx, 0.088, fz + zd * 0.12),
+                      (fx, 0.070, fz + zd * 0.22)],
+                     [(0.108, 0.122), (0.086, 0.130), (0.064, 0.116)], sides=8)
         _mat(foot, skin)
         _smooth(foot, 2)
         parts.append(foot)
 
-        for i, ox in enumerate((-0.125, 0.0, 0.125)):
+        for i, ox in enumerate((-0.098, 0.0, 0.098)):
             cl = _tube(f"{TAG}claw_{side}_{i}",
-                       [(fx + ox, 0.090, fz + zd * 0.24),
-                        (fx + ox * 1.25, 0.066, fz + zd * 0.39),
-                        (fx + ox * 1.45, 0.028, fz + zd * 0.53)],
-                       [0.062, 0.042, 0.004], sides=6)
+                       [(fx + ox, 0.074, fz + zd * 0.20),
+                        (fx + ox * 1.25, 0.054, fz + zd * 0.33),
+                        (fx + ox * 1.45, 0.022, fz + zd * 0.45)],
+                       [0.050, 0.034, 0.004], sides=6)
             _mat(cl, mats["horn"])
             _smooth(cl, 2)
             parts.append(cl)
         sp = _tube(f"{TAG}spur_{side}",
-                   [(fx, 0.195, fz - zd * 0.05), (fx, 0.125, fz - zd * 0.21),
-                    (fx, 0.055, fz - zd * 0.35)],
-                   [0.058, 0.036, 0.004], sides=6)
+                   [(fx, 0.150, fz - zd * 0.04), (fx, 0.098, fz - zd * 0.17),
+                    (fx, 0.044, fz - zd * 0.28)],
+                   [0.046, 0.029, 0.004], sides=6)
         _mat(sp, mats["horn"])
         _smooth(sp, 2)
         parts.append(sp)
@@ -769,12 +811,12 @@ def _build_legs(parts, mats, rng):
 # ================================================================== armour ===
 
 def _build_armor(parts, glow, mats, rng, torso, arms, legs):
-    """Woven black obsidian plate with teal filigree, a big spiked LEFT
-    pauldron, and a belt with a metal skull clasp.
-
-    Every plate is a `_shell` lofted off the body's own parametric surface,
-    so it curves with the chest and sits 2-4 cm proud of the hide.  On the
-    torso, a = 0 is dead centre front and a = +pi/2 is his left side."""
+    """Woven black obsidian plate with teal filigree, ONE big spiked left
+    pauldron, and a belt with a metal skull clasp.  Every plate is a _shell
+    lofted off the body's own parametric surface, so it curves with the form
+    and sits 1.5-3 cm proud of the hide.  On the torso a = 0 is dead centre
+    front, a = +pi/2 is his left.  Small spikes are deliberately scarce: a
+    few large ones read as menace, dozens read as noise."""
     A, AH, F = mats["armor"], mats["armor_hi"], mats["filigree"]
 
     def shell(name, surf, t0, t1, a0, a1, m=None, **kw):
@@ -783,193 +825,167 @@ def _build_armor(parts, glow, mats, rng, torso, arms, legs):
         parts.append(o)
         return o
 
-    def fil(name, surf, ta, gap, w=0.013):
-        _band(glow, TAG + name, surf, ta, w, 0.009, gap, F)
+    def fil(name, surf, ta, gap, w=0.011):
+        _band(glow, TAG + name, surf, ta, w, 0.008, gap, F)
 
-    # ---- cuirass: many small curved plates, not two big slabs -----------
-    shell("cuir_sternum", torso, 0.505, 0.815, -0.36, 0.36,
-          gap0=0.018, gap1=0.024, thick=0.042, nt=7, na=7, m=AH)
-    shell("cuir_pec_l", torso, 0.530, 0.805, 0.39, 1.06,
-          gap0=0.016, gap1=0.022, thick=0.040, nt=6, na=6)
-    shell("cuir_pec_r", torso, 0.500, 0.780, -1.06, -0.39,
-          gap0=0.016, gap1=0.022, thick=0.040, nt=6, na=6)
-    shell("cuir_clav", torso, 0.815, 0.920, -1.18, 1.18,
-          gap0=0.026, gap1=0.040, thick=0.044, nt=4, na=10, m=AH)
-    shell("cuir_flank_l", torso, 0.430, 0.740, 1.10, 1.72,
-          gap0=0.014, thick=0.034, nt=6, na=5)
-    shell("cuir_flank_r", torso, 0.410, 0.715, -1.72, -1.10,
-          gap0=0.014, thick=0.034, nt=6, na=5)
-    shell("cuir_back", torso, 0.520, 0.900, 2.45, 3.84,
-          gap0=0.016, thick=0.040, nt=7, na=8)
-    shell("girdle", torso, 0.430, 0.520, -1.60, 1.60,
-          gap0=0.018, thick=0.038, nt=3, na=12, m=AH)
+    # ---- cuirass ---------------------------------------------------------
+    shell("cuir_sternum", torso, 0.545, 0.875, -0.34, 0.34,
+          gap0=0.014, gap1=0.020, thick=0.034, nt=7, na=7, m=AH)
+    shell("cuir_pec_l", torso, 0.570, 0.865, 0.37, 1.02,
+          gap0=0.012, gap1=0.018, thick=0.032, nt=6, na=6)
+    shell("cuir_pec_r", torso, 0.540, 0.840, -1.02, -0.37,
+          gap0=0.012, gap1=0.018, thick=0.032, nt=6, na=6)
+    # NOTHING on the flanks, the back, the collarbone or the belly: bare
+    # glossy obsidian hide, so the cracks have skin to run across.
 
-    # ---- "woven" obsidian: narrow straps crossing over the midriff ------
-    for i in range(5):
-        off = -0.26 + i * 0.13
+    # ---- "woven" obsidian straps crossing the midriff -------------------
+    for i in range(2):
+        off = -0.10 + i * 0.20
         _band(parts, f"{TAG}weave_a{i}", torso,
-              [(0.16 + k * 0.055, -0.95 + off + k * 0.48) for k in range(5)],
-              0.070, 0.022, 0.010, A)
+              [(0.16 + k * 0.055, -0.80 + off + k * 0.40) for k in range(5)],
+              0.052, 0.016, 0.008, A)
         _band(parts, f"{TAG}weave_b{i}", torso,
-              [(0.16 + k * 0.055, 0.95 + off - k * 0.48) for k in range(5)],
-              0.062, 0.020, 0.024, AH)
+              [(0.16 + k * 0.055, 0.80 + off - k * 0.40) for k in range(5)],
+              0.048, 0.014, 0.018, AH)
 
-    # ---- filigree tracery over the cuirass ------------------------------
-    for i in range(5):
-        a = -0.27 + i * 0.135
-        fil(f"fil_ch{i}", torso, [(0.52 + k * 0.072, a * (1.0 - k * 0.12))
-                                  for k in range(5)], gap=0.064)
-    for i in range(3):
-        t = 0.56 + i * 0.100
-        fil(f"fil_chh{i}", torso, [(t, -0.34 + k * 0.17) for k in range(5)],
-            gap=0.064, w=0.011)
-    for i in range(3):
-        fil(f"fil_back{i}", torso, [(0.56 + k * 0.08, 2.70 + i * 0.42) for k in range(5)],
-            gap=0.060, w=0.012)
+    # ---- filigree tracery ------------------------------------------------
+    # one spine line down the sternum plus two sweeping arcs -- a crest,
+    # not a grid of tally marks.
+    fil("fil_spine", torso, [(0.56 + k * 0.075, 0.02) for k in range(5)], gap=0.050)
+    for sgn in (1, -1):
+        fil(f"fil_arc{sgn}", torso,
+            [(0.86 - k * 0.055, sgn * (0.06 + 0.075 * k)) for k in range(5)],
+            gap=0.050, w=0.009)
+    for i in range(2):
+        fil(f"fil_back{i}", torso, [(0.61 + k * 0.075, 2.85 + i * 0.55) for k in range(5)],
+            gap=0.048, w=0.009)
 
-    # ---- high collar behind the head: sells the hunch -------------------
-    shell("collar", torso, 0.880, 1.000, 1.85, 4.45,
-          gap0=0.045, gap1=0.300, thick=0.050, nt=4, na=14, m=AH)
-    for i in range(7):
-        a = 2.05 + i * 0.39
-        base, n = torso.at(0.995, a, gap=0.30)
-        sp = _tube(f"{TAG}collarspike_{i}",
-                   [base, base + n * 0.10 + Vector((0, 0.09, 0)),
-                    base + n * 0.17 + Vector((0, 0.20, 0))],
-                   [0.050, 0.030, 0.004], sides=6)
-        _mat(sp, mats["horn"])
-        _smooth(sp, 1)
-        parts.append(sp)
+    # ---- low collar across the back of the shoulders --------------------
+    c0, c1 = Vector((0.04, 2.16, 0.06)), Vector((0.04, 2.40, -0.14))
+    nr, nc = 3, 11
+    bmc = bmesh.new()
+    rows_i, rows_o = [], []
+    for ri in range(nr + 1):
+        f = ri / nr
+        c = c0.lerp(c1, f)
+        rad = 0.255 + 0.105 * f
+        ii, oo = [], []
+        for ci in range(nc + 1):
+            a = 2.20 + (4.30 - 2.20) * (ci / nc)
+            dv = Vector((math.sin(a), 0.0, math.cos(a)))
+            ii.append(bmc.verts.new(c + dv * rad))
+            oo.append(bmc.verts.new(c + dv * (rad + 0.045)))
+        rows_i.append(ii)
+        rows_o.append(oo)
+    for ri in range(nr):
+        for ci in range(nc):
+            bmc.faces.new([rows_o[ri][ci], rows_o[ri][ci + 1],
+                           rows_o[ri + 1][ci + 1], rows_o[ri + 1][ci]])
+            bmc.faces.new([rows_i[ri][ci], rows_i[ri + 1][ci],
+                           rows_i[ri + 1][ci + 1], rows_i[ri][ci + 1]])
+        bmc.faces.new([rows_o[ri][0], rows_o[ri + 1][0], rows_i[ri + 1][0], rows_i[ri][0]])
+        bmc.faces.new([rows_o[ri][nc], rows_i[ri][nc], rows_i[ri + 1][nc], rows_o[ri + 1][nc]])
+    for ci in range(nc):
+        bmc.faces.new([rows_o[0][ci], rows_i[0][ci], rows_i[0][ci + 1], rows_o[0][ci + 1]])
+        bmc.faces.new([rows_o[nr][ci], rows_o[nr][ci + 1], rows_i[nr][ci + 1], rows_i[nr][ci]])
+    bmesh.ops.recalc_face_normals(bmc, faces=bmc.faces[:])
+    collar = _link(TAG + "collar", bmc)
+    _mat(collar, AH)
+    bvc = collar.modifiers.new("Bevel", "BEVEL")
+    bvc.width = 0.007
+    bvc.segments = 2
+    parts.append(collar)
 
-    # ---- spiked LEFT pauldron, lofted off the deltoid -------------------
+    # ---- the spiked LEFT pauldron: four big spikes, nothing else --------
     la = arms["l"]
-    shell("paul_l0", la, 0.000, 0.135, -math.pi, math.pi,
-          gap0=0.045, gap1=0.060, thick=0.050, nt=3, na=14, m=AH, bevel=0.010)
-    shell("paul_l1", la, 0.105, 0.255, -2.75, 0.75,
-          gap0=0.075, gap1=0.090, thick=0.050, nt=4, na=10, bevel=0.012)
-    shell("paul_l2", la, 0.230, 0.385, -2.55, 0.60,
-          gap0=0.095, gap1=0.105, thick=0.048, nt=4, na=10, m=AH, bevel=0.012)
-    for i, (t, a, ln, lift) in enumerate([(0.05, -2.45, 0.62, 0.55),
-                                          (0.07, -1.95, 0.72, 0.45),
-                                          (0.09, -1.45, 0.70, 0.30),
-                                          (0.12, -0.95, 0.58, 0.18),
-                                          (0.20, -2.20, 0.52, 0.35),
-                                          (0.20, -1.25, 0.48, 0.15)]):
-        base, n = la.at(t, a, gap=0.075)
+    shell("paul_l0", la, 0.000, 0.145, -math.pi, math.pi,
+          gap0=0.034, gap1=0.046, thick=0.042, nt=3, na=14, m=AH, bevel=0.010)
+    shell("paul_l1", la, 0.115, 0.270, -2.70, 0.70,
+          gap0=0.056, gap1=0.068, thick=0.042, nt=4, na=10, bevel=0.012)
+    shell("paul_l2", la, 0.245, 0.395, -2.50, 0.55,
+          gap0=0.072, gap1=0.080, thick=0.040, nt=4, na=10, m=AH, bevel=0.012)
+    for i, (t, a, ln, lift) in enumerate([(0.04, -2.30, 0.44, 0.55),
+                                          (0.07, -1.75, 0.52, 0.42),
+                                          (0.11, -1.20, 0.46, 0.26),
+                                          (0.24, -1.90, 0.34, 0.45)]):
+        base, n = la.at(t, a, gap=0.056)
         d = (n + Vector((0.0, lift, 0.0))).normalized()
         sp = _tube(f"{TAG}paulspike_{i}",
                    [base, base + d * ln * 0.40, base + d * ln * 0.74, base + d * ln],
-                   [0.088, 0.060, 0.033, 0.004], sides=6)
+                   [0.072, 0.049, 0.027, 0.004], sides=6)
         _mat(sp, mats["horn"])
         _smooth(sp, 2)
         parts.append(sp)
-    for i in range(4):
-        fil(f"fil_paul{i}", la, [(0.02 + k * 0.08, -2.5 + i * 0.75)
-                                 for k in range(4)], gap=0.130, w=0.014)
+    for i in range(3):
+        fil(f"fil_paul{i}", la, [(0.02 + k * 0.09, -2.3 + i * 0.85)
+                                 for k in range(4)], gap=0.100, w=0.012)
 
-    # ---- smaller strapped RIGHT shoulder plate (asymmetry) --------------
+    # ---- plain strapped RIGHT shoulder plate (asymmetry) ----------------
     ra = arms["r"]
-    shell("paul_r0", ra, 0.000, 0.130, -math.pi, math.pi,
-          gap0=0.030, gap1=0.040, thick=0.042, nt=3, na=12)
-    shell("paul_r1", ra, 0.100, 0.235, 0.45, 3.30,
-          gap0=0.052, gap1=0.062, thick=0.044, nt=4, na=9, m=AH)
-    for i, (t, a, ln) in enumerate([(0.06, 1.70, 0.28), (0.14, 2.25, 0.24)]):
-        base, n = ra.at(t, a, gap=0.055)
-        d = (n + Vector((0.0, 0.5, 0.0))).normalized()
-        sp = _tube(f"{TAG}paulspike_r{i}", [base, base + d * ln * 0.6, base + d * ln],
-                   [0.058, 0.032, 0.004], sides=6)
-        _mat(sp, mats["horn"])
-        _smooth(sp, 1)
-        parts.append(sp)
+    shell("paul_r0", ra, 0.000, 0.135, -math.pi, math.pi,
+          gap0=0.024, gap1=0.032, thick=0.036, nt=3, na=12)
+    shell("paul_r1", ra, 0.105, 0.240, 0.45, 3.30,
+          gap0=0.042, gap1=0.050, thick=0.036, nt=4, na=9, m=AH)
 
-    # ---- bracers, lofted straight onto the forearms ---------------------
+    # ---- short bracers only; upper arms and most of the forearms bare ---
     for side in ("l", "r"):
         s = arms[side]
-        shell(f"bracer_{side}", s, 0.640, 0.900, -math.pi, math.pi,
-              gap0=0.028, gap1=0.024, thick=0.042, nt=4, na=12)
-        for i in range(3):
-            fil(f"fil_brac_{side}{i}", s,
-                [(0.66 + k * 0.07, -1.0 + i * 1.0) for k in range(4)], gap=0.074, w=0.012)
-        for i in range(2):
-            base, n = s.at(0.70 + i * 0.10, -1.55 if side == "l" else 1.55, gap=0.070)
-            sp = _tube(f"{TAG}bracspike_{side}{i}",
-                       [base, base + n * 0.09, base + n * 0.18],
-                       [0.046, 0.027, 0.003], sides=6)
-            _mat(sp, mats["horn"])
-            _smooth(sp, 1)
-            parts.append(sp)
+        shell(f"bracer_{side}", s, 0.760, 0.920, -math.pi, math.pi,
+              gap0=0.020, gap1=0.016, thick=0.032, nt=3, na=12)
+        fil(f"fil_brac_{side}", s,
+            [(0.78 + k * 0.045, -0.8) for k in range(4)], gap=0.054, w=0.010)
 
-    # ---- thigh / knee plating, lofted onto the legs ---------------------
-    for side in ("l", "r"):
-        s = legs[side]
-        shell(f"thigh_{side}", s, 0.060, 0.260, -1.15, 1.15,
-              gap0=0.022, thick=0.042, nt=4, na=8, m=AH)
-        shell(f"knee_{side}", s, 0.285, 0.420, -1.35, 1.35,
-              gap0=0.028, thick=0.046, nt=3, na=9)
-        base, n = s.at(0.345, 0.0, gap=0.070)
-        sp = _tube(f"{TAG}kneespike_{side}", [base, base + n * 0.12, base + n * 0.24],
-                   [0.064, 0.037, 0.004], sides=6)
-        _mat(sp, mats["horn"])
-        _smooth(sp, 1)
-        parts.append(sp)
-        fil(f"fil_knee_{side}", s, [(0.32, -0.9 + k * 0.6) for k in range(4)],
-            gap=0.080, w=0.012)
-        shell(f"greave_{side}", s, 0.560, 0.720, -1.5, 1.5,
-              gap0=0.022, thick=0.038, nt=3, na=9)
+    # The legs wear NO plate at all -- bare demon hide from hip to claw,
+    # which is where most of the crack network lives.
 
     # ---- belt + metal skull clasp ---------------------------------------
     belt = _tube(TAG + "belt",
-                 [(0.0, 1.400, -0.045), (0.0, 1.475, -0.010), (0.0, 1.550, 0.000)],
-                 [(0.268, 0.374), (0.293, 0.409), (0.273, 0.384)], sides=14)
+                 [(0.0, 1.400, -0.025), (0.0, 1.465, 0.000), (0.0, 1.530, 0.010)],
+                 [(0.190, 0.262), (0.208, 0.288), (0.192, 0.268)], sides=14)
     _mat(belt, A)
-    belt.modifiers.new("Bevel", "BEVEL").width = 0.009
+    belt.modifiers.new("Bevel", "BEVEL").width = 0.008
     parts.append(belt)
-    for i in range(9):
-        a = -1.40 + i * 0.35
-        o = add_box(f"{TAG}beltstud{i}", (0.08, 0.085, 0.055),
-                    (math.sin(a) * 0.405, 1.478, math.cos(a) * 0.300 - 0.010),
-                    rotation=(0.0, -a, 0.0), bevel_width=0.008, bevel_segments=2)
+    for i in range(7):
+        a = -1.25 + i * 0.42
+        o = add_box(f"{TAG}beltstud{i}", (0.062, 0.066, 0.042),
+                    (math.sin(a) * 0.288, 1.468, math.cos(a) * 0.214 + 0.000),
+                    rotation=(0.0, -a, 0.0), bevel_width=0.006, bevel_segments=2)
         _mat(o, AH)
         parts.append(o)
 
-    sk = Vector((0.03, 1.478, 0.310))
-    cr = _blob(TAG + "skull_cranium", tuple(sk + Vector((0, 0.035, -0.012))),
-               (0.120, 0.112, 0.092), subdiv=2)
+    sk = Vector((0.02, 1.468, 0.232))
+    cr = _blob(TAG + "skull_cranium", tuple(sk + Vector((0, 0.030, -0.010))),
+               (0.122, 0.114, 0.094), subdiv=2)
     _mat(cr, mats["steel"])
     _smooth(cr, 1)
     parts.append(cr)
-    jw = _blob(TAG + "skull_jaw", tuple(sk + Vector((0, -0.062, 0.018))),
-               (0.094, 0.057, 0.078), subdiv=2)
+    jw = _blob(TAG + "skull_jaw", tuple(sk + Vector((0, -0.052, 0.015))),
+               (0.096, 0.058, 0.080), subdiv=2)
     _mat(jw, mats["steel"])
     _smooth(jw, 1)
     parts.append(jw)
     for sx in (-1, 1):
-        soc = _blob(f"{TAG}skull_socket_{sx}", tuple(sk + Vector((sx * 0.051, 0.042, 0.072))),
-                    (0.035, 0.030, 0.022), subdiv=2)
+        soc = _blob(f"{TAG}skull_socket_{sx}", tuple(sk + Vector((sx * 0.042, 0.035, 0.060))),
+                    (0.029, 0.025, 0.018), subdiv=2)
         _mat(soc, mats["crack_dim"])
         glow.append(soc)
-        base = sk + Vector((sx * 0.097, 0.066, 0.008))
+        base = sk + Vector((sx * 0.080, 0.055, 0.006))
         hs = _tube(f"{TAG}skull_horn_{sx}",
-                   [base, base + Vector((sx * 0.060, 0.065, -0.034)),
-                    base + Vector((sx * 0.090, 0.115, -0.078))],
-                   [0.030, 0.018, 0.003], sides=6)
+                   [base, base + Vector((sx * 0.050, 0.054, -0.028)),
+                    base + Vector((sx * 0.075, 0.096, -0.065))],
+                   [0.025, 0.015, 0.003], sides=6)
         _mat(hs, mats["steel"])
         _smooth(hs, 1)
         parts.append(hs)
-    for i in range(4):
-        o = add_box(f"{TAG}skull_teeth{i}", (0.024, 0.038, 0.022),
-                    (sk.x - 0.038 + i * 0.026, 1.432, sk.z + 0.058), bevel_width=0.004)
-        _mat(o, mats["steel"])
-        parts.append(o)
 
     # ---- tassets hanging off the belt -----------------------------------
-    for i, (a, ln) in enumerate([(-1.15, 0.36), (-0.70, 0.46), (-0.25, 0.52),
-                                 (0.22, 0.50), (0.68, 0.42), (1.12, 0.32)]):
-        bx = math.sin(a) * 0.41
-        bz = math.cos(a) * 0.305 - 0.015
-        o = add_box(f"{TAG}tasset{i}", (0.25, ln, 0.07),
-                    (bx * 1.06, 1.395 - ln * 0.5, bz * 1.06),
-                    rotation=(0.14, -a, 0.03), bevel_width=0.010, bevel_segments=2)
+    for i, (a, ln) in enumerate([(-1.05, 0.30), (-0.62, 0.40), (-0.20, 0.44),
+                                 (0.22, 0.42), (0.64, 0.34)]):
+        bx = math.sin(a) * 0.292
+        bz = math.cos(a) * 0.222
+        o = add_box(f"{TAG}tasset{i}", (0.20, ln, 0.055),
+                    (bx * 1.05, 1.392 - ln * 0.5, bz * 1.05),
+                    rotation=(0.14, -a, 0.03), bevel_width=0.009, bevel_segments=2)
         _mat(o, AH if i % 2 else A)
         parts.append(o)
 
@@ -980,33 +996,34 @@ def _build_cape(mats, rng):
     """Torn, smouldering black cape: a shoulder-anchored grid swept back by
     wind, with whole columns cut short so the hem tears into strips and real
     gaps open between them.  Returns (object, torn-edge points for embers)."""
-    nu, nv = 26, 18
-    y_top = 2.44
-    R = 0.60
-    a0, a1 = math.radians(56.0), math.radians(304.0)
-    Lmax = 2.45
+    nu, nv = 30, 22
+    y_top = 2.30
+    R = 0.40
+    a0, a1 = math.radians(74.0), math.radians(286.0)
+    Lmax = 2.30
 
     lengths = []
     for i in range(nu + 1):
         u = i / nu
-        base = 0.78 + 0.13 * math.sin(u * 7.3 + 1.1) + 0.10 * math.sin(u * 15.1)
+        base = 0.72 + 0.15 * math.sin(u * 7.3 + 1.1) + 0.11 * math.sin(u * 15.1)
         roll = rng.random()
-        if roll < 0.24:
-            base *= rng.uniform(0.40, 0.62)                   # deep tear
-        elif roll < 0.42:
-            base = min(1.0, base * rng.uniform(1.10, 1.24))   # long tongue
-        lengths.append(max(0.22, min(1.0, base)))
+        if roll < 0.30:
+            base *= rng.uniform(0.30, 0.55)                   # deep tear
+        elif roll < 0.46:
+            base = min(1.0, base * rng.uniform(1.18, 1.38))   # long tongue
+        lengths.append(max(0.16, min(1.0, base)))
 
     def vert(i, j):
         u = i / nu
         a = a0 + (a1 - a0) * u
         v = j / nv
-        x0, z0 = math.sin(a) * R, math.cos(a) * R
-        y = y_top - v * Lmax * 0.93
-        flare = 1.0 + 1.00 * v
-        x = x0 * flare + 0.32 * v * v + 0.12 * math.sin(a * 2.1 + v * 3.4) * v
-        z = z0 * (1.0 + 0.38 * v) - 0.82 * v * v + 0.11 * math.sin(a * 3.3 + v * 2.0) * v
-        y += 0.07 * math.sin(a * 2.7) * v
+        rx, rz = math.sin(a), math.cos(a)
+        fold = 0.125 * math.sin(u * math.pi * 9.0) * (v ** 0.6)
+        rad = R * (1.0 + 0.72 * v) + fold
+        y = y_top - v * Lmax * 0.94
+        x = rx * rad + 0.22 * v * v
+        z = rz * rad - 0.72 * v ** 1.7
+        y += 0.08 * math.sin(a * 2.7 + 0.8) * v
         return Vector((x, y, z))
 
     bm = bmesh.new()
@@ -1034,7 +1051,7 @@ def _build_cape(mats, rng):
     sub.levels = 1
     sub.render_levels = 1
     sol = cape.modifiers.new("Solidify", "SOLIDIFY")
-    sol.thickness = 0.018
+    sol.thickness = 0.014
     sol.offset = 0.0
     return cape, edge_pts
 
@@ -1042,41 +1059,39 @@ def _build_cape(mats, rng):
 # ===================================================================== axe ===
 
 def _build_axe(parts, glow, ichor, mats, rng):
-    """A huge, crude two-handed axe resting on the forward left shoulder.
-    The head is a proper bearded crescent -- straight top shoulder, wide
-    cutting arc, long hooked beard -- with a bright honed edge so it reads
-    as an axe and not as a dark angular mass."""
-    d, o, n, T = AXE_D, AXE_O, AXE_N, AXE_T
-    butt = AXE_G - d * 0.42
+    """A huge two-handed axe: a 2.2 m haft lying diagonally across the back
+    with the head resting above the forward left shoulder.  The head is a
+    bearded crescent ~0.80 m across with a bright honed bit, so the
+    silhouette reads unmistakably as an axe."""
+    d, o, n, T, B = AXE_D, AXE_O, AXE_N, AXE_T, AXE_B
 
     haft = _tube(TAG + "axe_haft",
-                 [butt, butt + d * 0.42, AXE_G, AXE_G.lerp(T, 0.55), T, T + d * 0.16],
-                 [0.058, 0.068, 0.074, 0.070, 0.066, 0.058], sides=10)
+                 [B, B.lerp(T, 0.28), B.lerp(T, 0.58), B.lerp(T, 0.84), T, T + d * 0.22],
+                 [0.044, 0.052, 0.057, 0.057, 0.054, 0.046], sides=10)
     _mat(haft, mats["axe"])
-    haft.modifiers.new("Bevel", "BEVEL").width = 0.006
+    haft.modifiers.new("Bevel", "BEVEL").width = 0.005
     for poly in haft.data.polygons:
         poly.use_smooth = True
     parts.append(haft)
-    cap = _tube(TAG + "axe_buttcap", [butt - d * 0.06, butt + d * 0.07], [0.082, 0.088], sides=10)
+    cap = _tube(TAG + "axe_buttcap", [B - d * 0.05, B + d * 0.06], [0.064, 0.070], sides=10)
     _mat(cap, mats["steel"])
     parts.append(cap)
-    for i in range(7):
-        p = AXE_G + d * (-0.32 + i * 0.105)
-        bind = _tube(f"{TAG}axe_bind{i}", [p - d * 0.026, p + d * 0.026], [0.084, 0.084], sides=10)
-        _mat(bind, mats["armor"])
+    for i in range(5):
+        p = L_WRI + d * (-0.22 + i * 0.11)
+        bind = _tube(f"{TAG}axe_bind{i}", [p - d * 0.022, p + d * 0.022], [0.064, 0.064], sides=10)
+        _mat(bind, mats["axe"])
         parts.append(bind)
 
-    # ---- bearded blade ---------------------------------------------------
-    # (s along the haft, t outward).  Outer arc = the cutting edge.
-    outline = [(0.44, 0.00), (0.46, 0.17), (0.40, 0.39), (0.26, 0.57),
-               (0.00, 0.69), (-0.30, 0.70), (-0.56, 0.57), (-0.70, 0.35),
-               (-0.62, 0.13), (-0.44, 0.00)]
-    th0, tmax = 0.075, 0.70
+    # ---- bearded blade: (s along the haft, t outward from it) -----------
+    outline = [(0.32, 0.00), (0.34, 0.16), (0.30, 0.38), (0.19, 0.56),
+               (-0.02, 0.66), (-0.28, 0.67), (-0.50, 0.55), (-0.62, 0.33),
+               (-0.54, 0.12), (-0.36, 0.00)]
+    th0, tmax = 0.070, 0.67
     bm = bmesh.new()
     front, back = [], []
-    for (s, t) in outline:
-        th = th0 * max(0.05, 1.0 - (t / tmax) * 0.95)
-        p = T + d * s + o * t
+    for (sp, tp) in outline:
+        th = th0 * max(0.05, 1.0 - (tp / tmax) * 0.95)
+        p = T + d * sp + o * tp
         front.append(bm.verts.new(p + n * th))
         back.append(bm.verts.new(p - n * th))
     bm.faces.new(front)
@@ -1088,127 +1103,159 @@ def _build_axe(parts, glow, ichor, mats, rng):
     blade = _link(TAG + "axe_blade", bm)
     _mat(blade, mats["axe"])
     bv = blade.modifiers.new("Bevel", "BEVEL")
-    bv.width = 0.013
+    bv.width = 0.011
     bv.segments = 2
     parts.append(blade)
 
-    # honed cutting edge: a bright steel welt along the outer arc
-    arc = [(0.26, 0.57), (0.13, 0.645), (0.00, 0.69), (-0.15, 0.705),
-           (-0.30, 0.70), (-0.44, 0.645), (-0.56, 0.57), (-0.65, 0.46)]
+    # the honed bit: a bright steel welt that draws the cutting arc
+    arc = [(0.19, 0.56), (0.09, 0.625), (-0.02, 0.66), (-0.15, 0.672),
+           (-0.28, 0.67), (-0.40, 0.625), (-0.50, 0.55), (-0.57, 0.45)]
     for i in range(len(arc) - 1):
         p0 = T + d * arc[i][0] + o * arc[i][1]
         p1 = T + d * arc[i + 1][0] + o * arc[i + 1][1]
-        e = _strip(f"{TAG}axe_welt{i}", p0, p1, o, 0.030, 0.018)
+        e = _strip(f"{TAG}axe_welt{i}", p0, p1, o, 0.034, 0.022)
         _mat(e, mats["axe_edge"])
         parts.append(e)
 
     bspike = _tube(TAG + "axe_backspike",
-                   [T - o * 0.02, T - o * 0.28 + d * 0.07, T - o * 0.50 + d * 0.14],
-                   [(0.185, 0.064), (0.125, 0.044), (0.012, 0.010)], sides=6)
+                   [T - o * 0.02, T - o * 0.24 + d * 0.06, T - o * 0.42 + d * 0.12],
+                   [(0.150, 0.054), (0.100, 0.036), (0.010, 0.008)], sides=6)
     _mat(bspike, mats["axe"])
     parts.append(bspike)
-    for i, s in enumerate((-0.42, 0.40)):
-        col = _tube(f"{TAG}axe_collar{i}", [T + d * s - o * 0.05, T + d * s + o * 0.14],
-                    [0.098, 0.084], sides=8)
+    for i, sp in enumerate((-0.36, 0.28)):
+        col = _tube(f"{TAG}axe_collar{i}", [T + d * sp - o * 0.05, T + d * sp + o * 0.12],
+                    [0.082, 0.070], sides=8)
         _mat(col, mats["steel"])
-        col.modifiers.new("Bevel", "BEVEL").width = 0.006
+        col.modifiers.new("Bevel", "BEVEL").width = 0.005
         parts.append(col)
-    fin = _tube(TAG + "axe_finial", [T + d * 0.16, T + d * 0.24, T + d * 0.33],
-                [0.058, 0.035, 0.004], sides=6)
+    fin = _tube(TAG + "axe_finial", [T + d * 0.22, T + d * 0.29, T + d * 0.36],
+                [0.048, 0.029, 0.004], sides=6)
     _mat(fin, mats["horn"])
     _smooth(fin, 1)
     parts.append(fin)
 
-    for i in range(5):
-        s = -0.38 + i * 0.19
-        f = _strip(f"{TAG}axe_fil{i}", T + d * s + o * 0.08 + n * (th0 * 0.92),
-                   T + d * (s * 0.5) + o * 0.46 + n * (th0 * 0.28), n, 0.018, 0.010)
+    for i in range(4):
+        sp = -0.30 + i * 0.19
+        f = _strip(f"{TAG}axe_fil{i}", T + d * sp + o * 0.07 + n * (th0 * 0.92),
+                   T + d * (sp * 0.5) + o * 0.42 + n * (th0 * 0.28), n, 0.016, 0.009)
         _mat(f, mats["filigree"])
         glow.append(f)
     for sgn in (1, -1):
         f = _strip(f"{TAG}axe_filspine{sgn}",
-                   T + d * (-0.38) + o * 0.12 + n * sgn * (th0 * 0.88),
-                   T + d * 0.36 + o * 0.12 + n * sgn * (th0 * 0.88), n * sgn, 0.024, 0.010)
+                   T + d * (-0.32) + o * 0.10 + n * sgn * (th0 * 0.88),
+                   T + d * 0.30 + o * 0.10 + n * sgn * (th0 * 0.88), n * sgn, 0.020, 0.009)
         _mat(f, mats["filigree"])
         glow.append(f)
 
-    # ---- ichor running off the cutting edge, dripping to the crystal ----
-    for i, (s, t) in enumerate([(0.22, 0.60), (0.00, 0.69), (-0.26, 0.70),
-                                (-0.50, 0.60), (-0.66, 0.34)]):
-        base = T + d * s + o * t
-        ln = rng.uniform(0.20, 0.42)
+    # ---- ichor: runnels down the blade face, then drops falling free ----
+    for i, (s0, t0) in enumerate([(0.14, 0.12), (-0.06, 0.16), (-0.30, 0.14),
+                                  (-0.44, 0.10)]):
+        pts = [T + d * s0 + o * t0 + n * (th0 * 0.80)]
+        for k in range(1, 4):
+            pts.append(T + d * (s0 - 0.05 * k) + o * (t0 + 0.145 * k)
+                       + n * (th0 * (0.80 - 0.18 * k)))
+        run = _tube(f"{TAG}axe_runnel{i}", pts,
+                    [0.018, 0.026, 0.021, 0.012], sides=6)
+        _mat(run, mats["ichor"])
+        _smooth(run, 2)
+        ichor.append(run)
+
+    for i, (sp, tp) in enumerate([(0.12, 0.60), (-0.04, 0.66), (-0.28, 0.67),
+                                  (-0.46, 0.57), (-0.58, 0.40)]):
+        base = T + d * sp + o * tp
+        ln = rng.uniform(0.26, 0.52)
         dr = _tube(f"{TAG}axe_drip{i}",
-                   [base, base + Vector((0.0, -ln * 0.35, 0.008)),
-                    base + Vector((0.008, -ln * 0.72, 0.012)),
-                    base + Vector((0.008, -ln, 0.010))],
+                   [base, base + Vector((0.0, -ln * 0.32, 0.006)),
+                    base + Vector((0.008, -ln * 0.70, 0.010)),
+                    base + Vector((0.008, -ln, 0.008))],
                    [0.028, 0.044, 0.030, 0.004], sides=6)
         _mat(dr, mats["ichor"])
         _smooth(dr, 2)
         ichor.append(dr)
-        if i in (1, 3):
-            dp = _blob(f"{TAG}axe_droplet{i}",
-                       tuple(base + Vector((0.008, -ln - rng.uniform(0.25, 0.60), 0.01))),
-                       (0.026, 0.042, 0.026), subdiv=2)
+        # free-falling drops on their way to the crystal floor
+        for k, fall in enumerate((0.36, 0.78)):
+            if (i + k) % 2:
+                continue
+            dp = _blob(f"{TAG}axe_droplet{i}_{k}",
+                       tuple(base + Vector((0.010, -ln - fall, 0.012))),
+                       (0.024, 0.040, 0.024), subdiv=2)
             _mat(dp, mats["ichor"])
             _smooth(dp, 1)
             ichor.append(dp)
-    for i in range(len(arc) - 1):
+    for i in range(0, len(arc) - 1, 2):
         p0 = T + d * arc[i][0] + o * arc[i][1]
         p1 = T + d * arc[i + 1][0] + o * arc[i + 1][1]
-        if i % 2 == 0:
-            sm = _strip(f"{TAG}axe_edgeichor{i}", p0, p1, n, 0.085, 0.034)
-            _mat(sm, mats["ichor"])
-            ichor.append(sm)
+        sm = _strip(f"{TAG}axe_edgeichor{i}", p0, p1, n, 0.050, 0.026)
+        _mat(sm, mats["ichor"])
+        ichor.append(sm)
 
 
 # ========================================================= ichor / embers ===
 
 def _build_ichor_splashes(ichor, mats, rng, torso, horn_surfs):
-    """Black-teal ichor splashed across the chest and horns, thrown off the
-    axe that rests there.  Placed on the real body surface."""
-    for i in range(16):
-        t = rng.uniform(0.42, 0.95)
-        a = rng.uniform(-1.05, 1.15)
-        p, _ = torso.at(t, a, gap=0.072 if abs(a) < 1.05 else 0.030)
-        s = rng.uniform(0.045, 0.100)
-        sp = _blob(f"{TAG}ichor_chest{i}", tuple(p),
-                   (s * rng.uniform(0.7, 1.5), s * rng.uniform(0.9, 1.9), 0.022),
-                   rot=(0.3, 0.0, rng.uniform(-0.8, 0.8)), subdiv=2)
-        _mat(sp, mats["ichor"])
-        ichor.append(sp)
-    for i in range(5):
-        a = rng.uniform(-0.70, 0.80)
-        t0 = rng.uniform(0.70, 0.90)
-        pts = [torso.at(t0 - k * 0.075, a + k * 0.03, gap=0.072)[0] for k in range(3)]
-        run = _tube(f"{TAG}ichor_run{i}", pts, [0.022, 0.017, 0.005], sides=6)
-        _mat(run, mats["ichor"])
-        _smooth(run, 1)
-        ichor.append(run)
-
+    """Flat, wet, irregular ichor splashes conforming to the chest and horns
+    -- thrown off the axe resting on the shoulder."""
+    for i in range(7):
+        _splash(ichor, f"{TAG}ichor_chest{i}", torso,
+                rng.uniform(0.52, 0.95), rng.uniform(-0.85, 0.95),
+                rng.uniform(0.030, 0.065), rng.uniform(0.14, 0.34), mats, rng,
+                drip=0.09 if i % 3 == 0 else 0.0)
     for hi, surf in enumerate(horn_surfs):
-        for i in range(5):
-            p, _ = surf.at(rng.uniform(0.04, 0.55), rng.uniform(0, 2 * math.pi))
-            s = rng.uniform(0.040, 0.085)
-            sp = _blob(f"{TAG}ichor_horn{hi}_{i}", tuple(p),
-                       (s * 1.4, s * rng.uniform(1.0, 2.0), s),
-                       rot=(rng.uniform(0, 1.0), rng.uniform(0, 3.1), 0.0), subdiv=2)
-            _mat(sp, mats["ichor"])
-            ichor.append(sp)
-        p, _ = surf.at(rng.uniform(0.22, 0.42), -math.pi / 2)
+        for i in range(2):
+            _splash(ichor, f"{TAG}ichor_horn{hi}_{i}", surf,
+                    rng.uniform(0.06, 0.45), rng.uniform(0.0, 6.28),
+                    rng.uniform(0.035, 0.070), rng.uniform(0.5, 1.1), mats, rng)
+        p, _ = surf.at(rng.uniform(0.18, 0.38), -math.pi / 2)
         dr = _tube(f"{TAG}ichor_horndrip{hi}",
-                   [p, p + Vector((0, -0.11, 0)), p + Vector((0, -0.20, 0.006))],
-                   [0.024, 0.030, 0.004], sides=6)
+                   [p, p + Vector((0, -0.09, 0)), p + Vector((0, -0.17, 0.005))],
+                   [0.020, 0.025, 0.003], sides=6)
         _mat(dr, mats["ichor"])
         _smooth(dr, 1)
         ichor.append(dr)
+
+
+def _build_wisps(glow, mats, rng, edge_pts):
+    """The geometry half of the evil aura: a few big torn ribbons of dark
+    teal vapour peeling off the shoulders, the horns and the burning hem of
+    the cape.  Deliberately few and large so they read at distance."""
+    seeds = [
+        (Vector((0.44, 2.50, 0.14)), Vector((0.30, 1.0, -0.95)), 0.78, 0.042),
+        (Vector((-0.38, 2.32, 0.00)), Vector((-0.26, 1.0, -1.00)), 0.66, 0.036),
+        (Vector((0.08, 2.38, -0.22)), Vector((0.04, 1.0, -1.15)), 0.84, 0.045),
+    ]
+    picks = edge_pts[:]
+    rng.shuffle(picks)
+    for p in picks[:2]:
+        seeds.append((Vector(p) + Vector((0, 0.04, 0)),
+                      Vector((rng.uniform(-0.3, 0.3), 1.0, rng.uniform(-0.7, -0.2))),
+                      rng.uniform(0.42, 0.68), rng.uniform(0.026, 0.038)))
+
+    for i, (base, up, ln, wd) in enumerate(seeds):
+        up = up.normalized()
+        side = up.cross(Vector((0.0, 0.0, 1.0)))
+        if side.length < 0.2:
+            side = up.cross(Vector((1.0, 0.0, 0.0)))
+        side.normalize()
+        pts, rad = [], []
+        for k in range(5):
+            f = k / 4.0
+            sway = math.sin(f * 3.4 + i) * 0.16 * ln
+            pts.append(base + up * (ln * f) + side * sway)
+            # flat ribbon: thin through, wide across, tapering to nothing
+            rad.append((wd * 0.14 * (1.0 - f * 0.70),
+                        wd * (1.0 - f * 0.92) + 0.002))
+        w = _tube(f"{TAG}wisp{i}", pts, rad, sides=6)
+        _mat(w, mats["wisp"])
+        _smooth(w, 2)
+        glow.append(w)
 
 
 def _build_embers(glow, mats, rng, edge_pts):
     """Smouldering embers along the cape's torn hem."""
     picks = edge_pts[:]
     rng.shuffle(picks)
-    for i, p in enumerate(picks[:16]):
-        s = rng.uniform(0.010, 0.023)
+    for i, p in enumerate(picks[:14]):
+        s = rng.uniform(0.012, 0.026)
         e = _blob(f"{TAG}ember{i}",
                   (p.x + rng.uniform(-0.02, 0.02), p.y + rng.uniform(-0.04, 0.01),
                    p.z + rng.uniform(-0.02, 0.02)),
@@ -1227,7 +1274,7 @@ def build():
 
     body, glow, armor, ichor, axe = [], [], [], [], []
 
-    torso_surf, horn_surfs = _build_body(body, glow, mats, rng)
+    torso_surf, horn_surfs, skin_surfs = _build_body(body, glow, mats, rng)
     arm_surfs = _build_arms(body, mats, rng)
     leg_surfs = _build_legs(body, mats, rng)
     _build_armor(armor, glow, mats, rng, torso_surf, arm_surfs, leg_surfs)
@@ -1235,22 +1282,32 @@ def build():
     _build_axe(axe, glow, ichor, mats, rng)
     _build_ichor_splashes(ichor, mats, rng, torso_surf, horn_surfs)
     _build_embers(glow, mats, rng, edge_pts)
+    _build_wisps(glow, mats, rng, edge_pts)
 
-    # ---- the signature: fine glowing cyan cracks across the hide --------
-    # Sparse on purpose: a branching network over the exposed muscle, not a
-    # net over every surface (that flattens the form).
+    # ---- fine glowing cyan cracks ---------------------------------------
+    # Few, long and branching rather than a dense net: the obsidian has to
+    # read as obsidian between them.
     cracks = []
-    _veins(cracks, "torso", torso_surf, rng, mats, 9, nseg=(4, 7), seg_len=0.11,
-           width=(0.009, 0.024), t_range=(0.10, 0.92), hot=0.20)
+    _veins(cracks, "torso", torso_surf, rng, mats, 6, nseg=(6, 10), seg_len=0.145,
+           width=(0.009, 0.021), t_range=(0.10, 0.95), hot=0.18, branch_p=0.55)
     for side, s in arm_surfs.items():
-        _veins(cracks, f"arm{side}", s, rng, mats, 6, nseg=(4, 7), seg_len=0.10,
-               width=(0.008, 0.019), t_range=(0.28, 0.95), hot=0.16)
+        _veins(cracks, f"arm{side}", s, rng, mats, 3, nseg=(5, 9), seg_len=0.135,
+               width=(0.007, 0.016), t_range=(0.26, 0.95), hot=0.14, branch_p=0.45)
     for side, s in leg_surfs.items():
-        _veins(cracks, f"leg{side}", s, rng, mats, 6, nseg=(4, 7), seg_len=0.11,
-               width=(0.008, 0.020), t_range=(0.38, 0.95), hot=0.14)
+        _veins(cracks, f"leg{side}", s, rng, mats, 3, nseg=(6, 10), seg_len=0.150,
+               width=(0.007, 0.017), t_range=(0.36, 0.95), hot=0.12, branch_p=0.45)
     for i, s in enumerate(horn_surfs):
-        _veins(cracks, f"horn{i}", s, rng, mats, 3, nseg=(3, 5), seg_len=0.13,
-               width=(0.006, 0.014), t_range=(0.05, 0.62), hot=0.28, branch_p=0.25)
+        _veins(cracks, f"horn{i}", s, rng, mats, 2, nseg=(4, 6), seg_len=0.150,
+               width=(0.005, 0.012), t_range=(0.05, 0.60), hot=0.25, branch_p=0.20)
+    # cracks on the bare hide of the FACE, snout and neck -- this is what
+    # separates a creature with glowing fissures from a machine with lit seams
+    skull_s, muzzle_s, neck_s = skin_surfs
+    _veins(cracks, "face", skull_s, rng, mats, 5, nseg=(3, 6), seg_len=0.085,
+           width=(0.005, 0.013), t_range=(0.15, 0.92), hot=0.34, branch_p=0.45)
+    _veins(cracks, "snout", muzzle_s, rng, mats, 3, nseg=(3, 5), seg_len=0.070,
+           width=(0.004, 0.011), t_range=(0.10, 0.90), hot=0.30, branch_p=0.35)
+    _veins(cracks, "neck", neck_s, rng, mats, 4, nseg=(3, 6), seg_len=0.080,
+           width=(0.006, 0.015), t_range=(0.08, 0.92), hot=0.26, branch_p=0.45)
 
     out = {
         "body": join_parts(body, TAG + "body"),

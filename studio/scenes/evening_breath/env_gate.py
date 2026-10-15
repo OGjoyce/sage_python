@@ -80,8 +80,8 @@ def _mats():
     """Every material this module uses, ENV_-prefixed."""
     m = {}
     m["floor"] = cs.materials.new_principled_material(
-        "ENV_crystal_floor", base_color=(0.78, 0.86, 0.93, 1.0), roughness=0.035,
-        transmission=0.96, ior=1.45)[0]
+        "ENV_crystal_floor", base_color=(0.86, 0.92, 0.97, 1.0), roughness=0.02,
+        transmission=0.985, ior=1.12)[0]
     m["floor_rim"] = cs.materials.new_principled_material(
         "ENV_crystal_rim", base_color=(0.46, 0.58, 0.69, 1.0), roughness=0.22,
         transmission=0.55, ior=1.5)[0]
@@ -111,13 +111,13 @@ def _mats():
         emission_color=UNDERLOOM, emission_strength=12.0)[0]
     m["underloom_hot"] = cs.materials.new_principled_material(
         "ENV_underloom_hot", base_color=(0.02, 0.01, 0.01, 1.0), roughness=1.0,
-        emission_color=(1.0, 0.38, 0.10, 1.0), emission_strength=20.0)[0]
+        emission_color=(1.0, 0.30, 0.07, 1.0), emission_strength=20.0)[0]
     m["underloom_dark"] = cs.materials.new_principled_material(
         "ENV_underloom_dark", base_color=(0.03, 0.01, 0.01, 1.0), roughness=1.0,
         emission_color=(0.70, 0.12, 0.03, 1.0), emission_strength=5.0)[0]
     m["crack"] = cs.materials.new_principled_material(
         "ENV_underloom_crack", base_color=(0.05, 0.01, 0.0, 1.0), roughness=0.9,
-        emission_color=(1.0, 0.30, 0.06, 1.0), emission_strength=14.0)[0]
+        emission_color=(1.0, 0.15, 0.03, 1.0), emission_strength=14.0)[0]
     m["crust"] = cs.materials.new_principled_material(
         "ENV_underloom_crust", base_color=(0.045, 0.022, 0.016, 1.0), roughness=0.96)[0]
     m["glyph"] = cs.materials.new_principled_material(
@@ -140,8 +140,11 @@ def _mats():
         "ENV_cloud_lit", base_color=(0.97, 0.93, 0.89, 1.0), roughness=0.95,
         emission_color=(1.0, 0.70, 0.42, 1.0), emission_strength=1.30)[0]
     m["cloud_shadow"] = cs.materials.new_principled_material(
-        "ENV_cloud_shadow", base_color=(0.56, 0.45, 0.46, 1.0), roughness=0.98,
-        emission_color=(0.75, 0.30, 0.22, 1.0), emission_strength=0.30)[0]
+        "ENV_cloud_shadow", base_color=(0.44, 0.33, 0.35, 1.0), roughness=0.98,
+        emission_color=(0.70, 0.26, 0.20, 1.0), emission_strength=0.22)[0]
+    m["cloud_deep"] = cs.materials.new_principled_material(
+        "ENV_cloud_deep", base_color=(0.32, 0.23, 0.25, 1.0), roughness=0.98,
+        emission_color=(1.0, 0.28, 0.09, 1.0), emission_strength=0.80)[0]
     m["cloud_deck"] = cs.materials.new_principled_material(
         "ENV_cloud_deck", base_color=(0.82, 0.70, 0.66, 1.0), roughness=0.97,
         emission_color=(1.0, 0.52, 0.30, 1.0), emission_strength=0.90)[0]
@@ -335,7 +338,7 @@ def _build_cracks(mats, rng):
             if math.hypot(cx, cz) > _island_radius(math.atan2(cz, cx)) - 1.5:
                 return
             b = add_box(f"ENV_crack_{idx}",
-                        (length, 0.05, rng.uniform(0.05, 0.17)),
+                        (length, 0.04, rng.uniform(0.035, 0.11)),
                         (cx, FLOOR_TOP - 0.07, cz),
                         rotation=(0.0, -heading_local, 0.0))
             assign_material(b, mats["crack"])
@@ -346,12 +349,12 @@ def _build_cracks(mats, rng):
             heading = heading_local
 
     # hero zone: the floor the camera actually studies, between the figures
-    for _ in range(26):
+    for _ in range(13):
         x = rng.uniform(-5.5, 5.5)
         z = rng.uniform(-3.5, 6.5)
         vein(x, z, rng.uniform(0, 2 * math.pi), rng.randint(3, 6), 0.8)
     # the rest of the island, sparser and longer
-    for _ in range(22):
+    for _ in range(11):
         a = rng.uniform(0, 2 * math.pi)
         r = rng.uniform(4.0, 15.0)
         vein(math.cos(a) * r, math.sin(a) * r, rng.uniform(0, 2 * math.pi),
@@ -359,11 +362,11 @@ def _build_cracks(mats, rng):
 
     # molten veining pressed against the slab underside: long thin slivers,
     # not slabs, so the glow under the glass stays filamentary
-    for i in range(70):
+    for i in range(34):
         a = rng.uniform(0, 2 * math.pi)
         r = rng.uniform(0.5, 16.0) ** 0.9
         b = add_box(f"ENV_pool_{i}",
-                    (rng.uniform(0.9, 4.0), 0.04, rng.uniform(0.06, 0.4)),
+                    (rng.uniform(0.9, 3.4), 0.04, rng.uniform(0.05, 0.26)),
                     (math.cos(a) * r, FLOOR_TOP - FLOOR_THICK + 0.05, math.sin(a) * r),
                     rotation=(0.0, rng.uniform(0, 3.0), 0.0))
         assign_material(b, mats["underloom_hot" if i % 5 == 0 else "crack"])
@@ -438,6 +441,19 @@ def _build_underloom(mats, rng):
                               rng.uniform(-0.18, 0.18)))
         assign_material(b, mats["crust"])
         parts.append(b)
+    # a deep floor of dull red far below the dome: between the abyss
+    # clouds it gives the drop a second, further layer, so looking through
+    # the crystal reads as depth rather than as one orange surface
+    for i in range(16):
+        a = 2.0 * math.pi * i / 16
+        r = rng.uniform(10.0, 72.0)
+        b = add_box(f"ENV_underloom_deep_{i}",
+                    (rng.uniform(22.0, 48.0), 0.3, rng.uniform(22.0, 44.0)),
+                    (math.cos(a) * r, rng.uniform(-33.0, -28.0), math.sin(a) * r),
+                    rotation=(0.0, rng.uniform(0, 3.0), 0.0))
+        assign_material(b, mats["underloom_dark"])
+        parts.append(b)
+
     # a brighter vent right under the sanctuary's middle, so the floor the
     # two figures stand on has hell directly beneath it rather than off to
     # one side
@@ -813,11 +829,11 @@ def _build_clouds(mats, rng):
 
     # --- billows lapping the island's rim: the layer that says "this rock
     #     is floating IN something", seen just over the broken edge
-    for i in range(46):
+    for i in range(64):
         a = rng.uniform(0, 2 * math.pi)
-        r = rng.uniform(26.0, 95.0)
-        size = rng.uniform(7.0, 19.0)
-        top = rng.uniform(-3.4, 1.6) - 0.012 * r
+        r = rng.uniform(26.0, 100.0)
+        size = rng.uniform(8.0, 22.0)
+        top = rng.uniform(-2.0, 2.8) - 0.010 * r
         for j in range(rng.randint(2, 4)):
             bs = size * rng.uniform(0.5, 1.0)
             _puff(parts, mats, f"ENV_cloud_rim_{i}_{j}",
@@ -825,13 +841,55 @@ def _build_clouds(mats, rng):
                    top - j * bs * 0.34 - rng.uniform(0.0, 2.0),
                    math.sin(a) * r + rng.uniform(-size, size)),
                   bs, rng, flat=(0.24, 0.5),
-                  mat="cloud_lit" if j == 0 else "cloud")
+                  mat=("cloud_lit", "cloud", "cloud_shadow", "cloud_shadow")[j])
+
+    # --- THE ABYSS UNDER THE GLASS. Sight-lines that enter the crystal
+    #     floor at a grazing angle leave its underside still grazing, so
+    #     what the camera sees THROUGH the floor is not the rock directly
+    #     beneath it -- it is the open air 20-100 m out and well down.
+    #     Filling that volume with cloud, lit from beneath by the
+    #     Underloom, is what turns the floor from a polished orange mirror
+    #     into a sheet of glass with a very long way down behind it.
+    for i in range(54):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(19.0, 115.0)
+        size = rng.uniform(5.0, 17.0)
+        y = rng.uniform(-26.0, -8.5) - 0.03 * r
+        for j in range(rng.randint(1, 3)):
+            bs = size * rng.uniform(0.55, 1.0)
+            _puff(parts, mats, f"ENV_cloud_abyss_{i}_{j}",
+                  (math.cos(a) * r + rng.uniform(-size, size),
+                   y - j * bs * 0.5,
+                   math.sin(a) * r + rng.uniform(-size, size)),
+                  bs, rng, flat=(0.18, 0.40),
+                  mat="cloud_deep" if j else "cloud_shadow")
+
+    # --- THE SEA ITSELF. From the hero camera only the wedge between the
+    #     island's rim (about 2.3 degrees down) and the horizon is open
+    #     sky, so a level cloud deck would show as a 30-pixel smear. These
+    #     crowns are placed ON that sight-line instead -- each one pokes
+    #     just over the rim, and together they march to the horizon as a
+    #     crowded field of cloud tops, which is what actually reads as
+    #     "an infinite sea of cloud seen from above".
+    for i in range(86):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(50.0, 330.0)
+        size = rng.uniform(9.0, 20.0) * (0.5 + r / 330.0)
+        top = 1.15 - 0.0394 * r + rng.uniform(-2.2, 1.0)
+        for j in range(rng.randint(2, 4)):
+            bs = size * rng.uniform(0.5, 1.0)
+            _puff(parts, mats, f"ENV_cloud_sea_{i}_{j}",
+                  (math.cos(a) * r + rng.uniform(-size, size),
+                   top - j * bs * 0.42 - rng.uniform(0.0, 2.0),
+                   math.sin(a) * r + rng.uniform(-size, size)),
+                  bs, rng, flat=(0.26, 0.55),
+                  mat=("cloud_lit", "cloud", "cloud_shadow", "cloud_shadow")[j])
 
     # --- two ranks of towers climbing to near eye level, which is what
     #     actually fills the frame behind and through the gate
     for band, (r0, r1, count, s0, s1, t0, t1) in enumerate((
-            (100.0, 320.0, 54, 16.0, 52.0, -9.0, 2.5),
-            (320.0, 900.0, 46, 46.0, 130.0, -20.0, 5.0))):
+            (100.0, 330.0, 72, 18.0, 58.0, -6.0, 6.5),
+            (330.0, 900.0, 54, 50.0, 140.0, -16.0, 9.0))):
         for i in range(count):
             a = rng.uniform(0, 2 * math.pi)
             r = rng.uniform(r0, r1)
@@ -844,7 +902,23 @@ def _build_clouds(mats, rng):
                        top - j * bs * 0.28 - rng.uniform(0.0, 6.0),
                        math.sin(a) * r + rng.uniform(-size, size)),
                       bs, rng, flat=(0.22, 0.46),
-                      mat="cloud_lit" if j == 0 else "cloud")
+                      mat=("cloud_lit", "cloud", "cloud_shadow", "cloud_shadow")[j])
+
+    # --- high banks above the horizon: seen through the gate's opening,
+    #     these are what stop the sky reading as an empty beige plain
+    for i in range(44):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(170.0, 820.0)
+        size = rng.uniform(40.0, 140.0) * (0.5 + r / 820.0)
+        y = rng.uniform(4.0, 34.0) + r * 0.012
+        for j in range(rng.randint(1, 3)):
+            bs = size * rng.uniform(0.5, 1.0)
+            _puff(parts, mats, f"ENV_cloud_bank_{i}_{j}",
+                  (math.cos(a) * r + rng.uniform(-size, size),
+                   y - j * bs * 0.16,
+                   math.sin(a) * r + rng.uniform(-size, size)),
+                  bs, rng, flat=(0.07, 0.17),
+                  mat=("cloud_lit", "cloud", "cloud_shadow")[j])
 
     # --- flat wisps: long thin streaks stacked through the horizon band,
     #     the cheapest possible "layered sunset cloudscape" cue

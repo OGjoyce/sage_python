@@ -207,7 +207,7 @@ def _materials():
         base_color=ICHOR,
         roughness=0.30,
         emission_color=(TEAL_CRACK[0] * 0.10, TEAL_CRACK[1] * 0.10, TEAL_CRACK[2] * 0.10, 1.0),
-        emission_strength=1.0,
+        emission_strength=0.38,
     )
     m["ichor_hot"], _ = cs.materials.new_principled_material(
         TAG + "ichor_hot",
@@ -233,50 +233,63 @@ def _materials():
         base_color=(0.30, 0.78, 0.82, 1.0),
         roughness=0.15,
         emission_color=TEAL_CRACK,
-        emission_strength=2.0,
+        emission_strength=9.0,
     )
     m["crack"], _ = cs.materials.new_principled_material(
         TAG + "crack",
-        base_color=(0.022, 0.048, 0.056, 1.0),
+        base_color=(0.018, 0.040, 0.048, 1.0),
         roughness=0.62,
-        emission_color=(TEAL_CRACK[0] * 0.06, TEAL_CRACK[1] * 0.06, TEAL_CRACK[2] * 0.06, 1.0),
-        emission_strength=0.5,
+        emission_color=(TEAL_CRACK[0] * 0.10, TEAL_CRACK[1] * 0.10, TEAL_CRACK[2] * 0.10, 1.0),
+        emission_strength=0.9,
     )
     return m
 
 
 # =========================================================== the fiend ====
 # ~2.1 m tall if it were upright (noticeably smaller than the 3 m Chaos
-# Lord). Headless, caught mid-stumble: torso pitched hard forward over a
-# planted trailing leg, the other leg swinging through in the air, right
-# arm flung out reaching, left arm flailing up and back.
+# Lord). Headless and STILL WALKING: caught at the contact frame of a
+# stride — right leg forward and just landed, left leg trailing and
+# pushing off with the heel lifted, hips and shoulders counter-rotated,
+# weight over the front leg, torso pitched slightly forward. The left arm
+# (opposite the lead leg, as in a real gait) is stretched out ahead.
+# The contact frame is used because it is the moment of a walk cycle whose
+# silhouette is unmistakable: both legs at full spread, one heel down,
+# one toe down.
 
-P_HIP = (0.02, 0.90, 0.02)
-P_BELLY = (0.10, 1.14, 0.26)
-P_CHEST = (0.20, 1.39, 0.62)
-R_SH = (0.47, 1.32, 0.57)
-L_SH = (-0.07, 1.37, 0.60)
-STUMP_A = (0.21, 1.37, 0.60)
-STUMP_B = (0.27, 1.53, 0.72)
+P_HIP = (0.00, 0.92, 0.02)
+P_BELLY = (0.03, 1.17, 0.13)
+P_CHEST = (0.07, 1.45, 0.27)
+# shoulders counter-rotate against the hips: lead-leg side pulled back
+R_SH = (0.40, 1.38, 0.11)
+L_SH = (-0.27, 1.41, 0.41)
+STUMP_A = (0.07, 1.44, 0.27)
+STUMP_B = (0.09, 1.61, 0.34)
 
-R_EL = (0.70, 1.18, 0.98)
-R_WR = (0.86, 1.08, 1.42)
-R_HAND = (0.915, 1.045, 1.555)
-L_EL = (-0.54, 1.20, 0.22)
-L_WR = (-0.80, 1.40, -0.16)
-L_HAND = (-0.89, 1.50, -0.30)
+# left arm stretched forward (contralateral to the lead leg)
+L_EL = (-0.48, 1.39, 0.64)
+L_WR = (-0.70, 1.355, 1.10)
+L_HAND = (-0.77, 1.345, 1.26)
+# right arm swung back behind the hip
+R_EL = (0.44, 1.19, -0.18)
+R_WR = (0.52, 0.99, -0.46)
+R_HAND = (0.55, 0.92, -0.56)
 
-RL_HIP = (0.19, 0.88, 0.04)
-RL_KNEE = (0.44, 0.60, 0.50)
-RL_ANK = (0.58, 0.40, 0.84)
-LL_HIP = (-0.16, 0.88, 0.00)
-LL_KNEE = (-0.34, 0.46, -0.22)
-LL_ANK = (-0.42, 0.12, -0.58)
+# lead leg: forward, nearly straight, heel just down
+RL_HIP = (0.17, 0.90, 0.11)
+RL_KNEE = (0.21, 0.52, 0.43)
+RL_ANK = (0.24, 0.135, 0.58)
+# trailing leg: extended back, pushing off, heel lifted
+LL_HIP = (-0.17, 0.92, -0.07)
+LL_KNEE = (-0.22, 0.49, -0.36)
+LL_ANK = (-0.26, 0.165, -0.64)
+
+# how far the whole walking body is turned inside its own group
+FIEND_GAIT_YAW = math.radians(60.0)
 
 # ichor fountain ballistics (used for both the arc and the droplets)
-FOUNT_V = Vector((0.62, 2.40, 0.30))
-FOUNT_G = 2.60
-FOUNT_T = 2.28
+FOUNT_V = Vector((0.72, 2.95, 0.34))
+FOUNT_G = 2.85
+FOUNT_T = 2.46
 
 
 def _fount_point(t):
@@ -292,168 +305,315 @@ def _fount_point(t):
 def _build_fiend(mats, parent):
     parts_skin = []
     parts_other = []
+    gore = []        # ichor-material parts that belong to the body
+    hot = []         # the few brighter spots
 
-    # ---- torso: pelvis -> belly -> chest, pitched forward ----
-    parts_skin.append(_seg(TAG + "fiend_pelvis", (0.0, 0.76, -0.04), P_HIP, 0.175, 0.160, 0.80))
+    # ---- torso: pelvis -> belly -> chest, pitched slightly forward ----
+    parts_skin.append(_seg(TAG + "fiend_pelvis", (0.0, 0.78, -0.03), P_HIP, 0.175, 0.160, 0.80))
     parts_skin.append(_seg(TAG + "fiend_abdomen", P_HIP, P_BELLY, 0.160, 0.150, 0.82))
     parts_skin.append(_seg(TAG + "fiend_chest", P_BELLY, P_CHEST, 0.155, 0.200, 0.78))
-    # ribcage / back mass
-    parts_skin.append(_sphere(TAG + "fiend_ribs", 0.195, (0.18, 1.30, 0.52)))
-    parts_skin[-1].scale = (1.05, 0.78, 0.85)
-    parts_skin.append(_sphere(TAG + "fiend_backhump", 0.140, (0.12, 1.32, 0.34)))
-    # shoulder yoke across the top of the chest
-    parts_skin.append(_seg(TAG + "fiend_clavicle", L_SH, R_SH, 0.115, 0.125, 0.85, levels=1))
+    parts_skin.append(_sphere(TAG + "fiend_ribs", 0.195, (0.05, 1.36, 0.20)))
+    parts_skin[-1].scale = (1.05, 0.80, 0.88)
+    parts_skin.append(_sphere(TAG + "fiend_backhump", 0.140, (0.03, 1.38, 0.06)))
+    # shoulder yoke, carrying the counter-rotation
+    parts_skin.append(_seg(TAG + "fiend_clavicle", L_SH, R_SH, 0.135, 0.145, 0.85, levels=1))
+    # trapezius slabs: they flatten and widen the top of the silhouette, so
+    # that at 150 px the eye reads "shoulders, and nothing above them"
+    for i, (c, sc) in enumerate([((0.20, 1.40, 0.19), (1.5, 0.55, 1.0)),
+                                 ((-0.12, 1.42, 0.33), (1.5, 0.55, 1.0))]):
+        tr = _sphere(TAG + f"fiend_trap_{i}", 0.145, c, subdivisions=2)
+        tr.scale = sc
+        parts_skin.append(tr)
 
-    # ---- severed neck: a short ragged stub, no head ----
-    parts_skin.append(_seg(TAG + "fiend_neck", STUMP_A, STUMP_B, 0.105, 0.088, 1.0))
-    # open wound cavity
+    # ======================= the torn neck stump =======================
     rng = random.Random(7)
     up = (Vector(STUMP_B) - Vector(STUMP_A)).normalized()
-    cav = _sphere(TAG + "fiend_stump_cavity", 0.080, tuple(Vector(STUMP_B) - up * 0.012))
-    cav.scale = (1.0, 0.45, 1.0)
-    parts_other.append((cav, mats["flesh"]))
-    # ragged torn edge: spurs of flesh flicked outward around the rim
     side = Vector((1.0, 0.0, 0.0)).cross(up).normalized()
     side2 = up.cross(side).normalized()
-    for i in range(9):
-        a = i / 9.0 * math.tau
-        rad = 0.082 + rng.uniform(-0.008, 0.012)
-        base = Vector(STUMP_B) + (side * math.cos(a) + side2 * math.sin(a)) * rad
-        tip = base + up * rng.uniform(0.035, 0.085) + (
-            side * math.cos(a) + side2 * math.sin(a)
-        ) * rng.uniform(0.01, 0.045)
-        spur = _seg(TAG + f"fiend_stump_rag_{i}", base, tip, 0.024, 0.006, 1.0, levels=1)
-        parts_other.append((spur, mats["flesh"]))
+    parts_skin.append(_seg(TAG + "fiend_neck", STUMP_A, STUMP_B, 0.105, 0.090, 1.0))
 
-    # ---- arms: right flung forward reaching, left flailing back ----
-    parts_skin.append(_sphere(TAG + "fiend_delt_r", 0.115, R_SH))
-    parts_skin.append(_seg(TAG + "fiend_uarm_r", R_SH, R_EL, 0.098, 0.076))
-    parts_skin.append(_sphere(TAG + "fiend_elbow_r", 0.072, R_EL, subdivisions=1))
-    parts_skin.append(_seg(TAG + "fiend_farm_r", R_EL, R_WR, 0.078, 0.052))
-    parts_skin.append(_seg(TAG + "fiend_hand_r", R_WR, R_HAND, 0.056, 0.042, 0.65))
-    hdir = (Vector(R_HAND) - Vector(R_WR)).normalized()
-    for i in range(4):
-        off = Vector((-0.045 + i * 0.030, -0.012 + 0.012 * (i % 2), 0.0))
-        base = Vector(R_HAND) + off
-        tip = base + hdir * 0.115 + Vector((0.01 * (i - 1.5), -0.035, 0.0))
-        claw = _seg(TAG + f"fiend_claw_r_{i}", base, tip, 0.020, 0.004, 1.0, levels=1)
-        parts_other.append((claw, mats["horn"]))
+    # torn muscle inside the stump, and the open wound bowl
+    cav = _sphere(TAG + "fiend_stump_cavity", 0.084, tuple(Vector(STUMP_B) - up * 0.010))
+    cav.scale = (1.0, 0.5, 1.0)
+    parts_other.append((cav, mats["flesh"]))
+    for i in range(7):
+        a = i / 7.0 * math.tau + 0.3
+        radial = side * math.cos(a) + side2 * math.sin(a)
+        b0 = Vector(STUMP_B) + radial * rng.uniform(0.025, 0.055) - up * 0.02
+        b1 = b0 + up * rng.uniform(0.02, 0.05) + radial * rng.uniform(-0.01, 0.015)
+        parts_other.append((_seg(TAG + f"fiend_muscle_{i}", tuple(b0), tuple(b1),
+                                 rng.uniform(0.016, 0.026), 0.008, 1.0, levels=1),
+                            mats["flesh"]))
+    # stump of spine standing proud of the wound
+    sp0 = Vector(STUMP_B) - up * 0.02
+    parts_other.append((_seg(TAG + "fiend_spine_stump", tuple(sp0), tuple(sp0 + up * 0.085),
+                             0.028, 0.020, 1.0, levels=1), mats["bone"]))
+    parts_other.append((_sphere(TAG + "fiend_vert_1", 0.030, tuple(sp0 + up * 0.090),
+                                subdivisions=2), mats["bone"]))
+    # flaps of skin peeled back and hanging off the rim
+    for i in range(7):
+        a = i / 7.0 * math.tau + 0.9
+        radial = (side * math.cos(a) + side2 * math.sin(a)).normalized()
+        b0 = Vector(STUMP_B) + radial * 0.085 - up * 0.01
+        mid = b0 + radial * 0.045 - up * rng.uniform(0.03, 0.07)
+        tip = mid + radial * rng.uniform(0.01, 0.03) - up * rng.uniform(0.05, 0.12)
+        flap = _ribbon(TAG + f"fiend_flap_{i}", [b0, mid, tip],
+                       [rng.uniform(0.028, 0.040), 0.022, 0.006],
+                       bevel_resolution=1, resolution_u=3)
+        flap.scale = (1.0, 1.0, 0.45)
+        parts_other.append((flap, mats["flesh"]))
+    # tendons and sinew strands trailing out of the wound
+    for i in range(6):
+        a = rng.uniform(0, math.tau)
+        radial = (side * math.cos(a) + side2 * math.sin(a)).normalized()
+        b0 = Vector(STUMP_B) + radial * rng.uniform(0.02, 0.07)
+        mid = b0 + up * rng.uniform(0.04, 0.10) + radial * rng.uniform(0.02, 0.06)
+        tip = mid + radial * rng.uniform(0.03, 0.09) - up * rng.uniform(0.02, 0.10)
+        parts_other.append((_ribbon(TAG + f"fiend_tendon_{i}", [b0, mid, tip],
+                                    [0.012, 0.008, 0.003],
+                                    bevel_resolution=1, resolution_u=3), mats["flesh"]))
+    # ragged torn skin around the rim
+    for i in range(10):
+        a = i / 10.0 * math.tau
+        radial = side * math.cos(a) + side2 * math.sin(a)
+        rad = 0.086 + rng.uniform(-0.008, 0.014)
+        base = Vector(STUMP_B) + radial * rad
+        tip = base + up * rng.uniform(0.03, 0.09) + radial * rng.uniform(0.01, 0.05)
+        parts_other.append((_seg(TAG + f"fiend_stump_rag_{i}", tuple(base), tuple(tip),
+                                 0.024, 0.006, 1.0, levels=1), mats["flesh"]))
 
-    parts_skin.append(_sphere(TAG + "fiend_delt_l", 0.112, L_SH))
-    parts_skin.append(_seg(TAG + "fiend_uarm_l", L_SH, L_EL, 0.096, 0.072))
-    parts_skin.append(_sphere(TAG + "fiend_elbow_l", 0.068, L_EL, subdivisions=1))
-    parts_skin.append(_seg(TAG + "fiend_farm_l", L_EL, L_WR, 0.074, 0.050))
-    parts_skin.append(_seg(TAG + "fiend_hand_l", L_WR, L_HAND, 0.054, 0.040, 0.65))
+    # ---- arms: left stretched out ahead, right swung back ----
+    parts_skin.append(_sphere(TAG + "fiend_delt_l", 0.115, L_SH))
+    parts_skin.append(_seg(TAG + "fiend_uarm_l", L_SH, L_EL, 0.098, 0.076))
+    parts_skin.append(_sphere(TAG + "fiend_elbow_l", 0.072, L_EL, subdivisions=1))
+    parts_skin.append(_seg(TAG + "fiend_farm_l", L_EL, L_WR, 0.078, 0.052))
+    parts_skin.append(_seg(TAG + "fiend_hand_l", L_WR, L_HAND, 0.056, 0.042, 0.65))
     hdir = (Vector(L_HAND) - Vector(L_WR)).normalized()
     for i in range(4):
-        base = Vector(L_HAND) + Vector((0.0, -0.030 + i * 0.022, 0.012 * (i % 2)))
-        tip = base + hdir * 0.10 + Vector((0.0, 0.03 * (i - 1.5), 0.0))
-        claw = _seg(TAG + f"fiend_claw_l_{i}", base, tip, 0.018, 0.004, 1.0, levels=1)
-        parts_other.append((claw, mats["horn"]))
+        base = Vector(L_HAND) + Vector((-0.040 + i * 0.028, -0.010 + 0.012 * (i % 2), 0.0))
+        tip = base + hdir * 0.115 + Vector((0.01 * (i - 1.5), -0.030, 0.0))
+        parts_other.append((_seg(TAG + f"fiend_claw_l_{i}", tuple(base), tuple(tip),
+                                 0.020, 0.004, 1.0, levels=1), mats["horn"]))
 
-    # ---- legs: right swinging through in the air, left planted & trailing ---
+    parts_skin.append(_sphere(TAG + "fiend_delt_r", 0.112, R_SH))
+    parts_skin.append(_seg(TAG + "fiend_uarm_r", R_SH, R_EL, 0.096, 0.072))
+    parts_skin.append(_sphere(TAG + "fiend_elbow_r", 0.068, R_EL, subdivisions=1))
+    parts_skin.append(_seg(TAG + "fiend_farm_r", R_EL, R_WR, 0.074, 0.050))
+    parts_skin.append(_seg(TAG + "fiend_hand_r", R_WR, R_HAND, 0.054, 0.040, 0.65))
+    hdir = (Vector(R_HAND) - Vector(R_WR)).normalized()
+    for i in range(4):
+        base = Vector(R_HAND) + Vector((-0.030 + i * 0.022, 0.0, 0.012 * (i % 2)))
+        tip = base + hdir * 0.10 + Vector((0.01 * (i - 1.5), -0.02, 0.0))
+        parts_other.append((_seg(TAG + f"fiend_claw_r_{i}", tuple(base), tuple(tip),
+                                 0.018, 0.004, 1.0, levels=1), mats["horn"]))
+
+    # ---- legs ----
+    # lead leg, heel just down and the sole rolling flat
     parts_skin.append(_seg(TAG + "fiend_thigh_r", RL_HIP, RL_KNEE, 0.145, 0.098))
     parts_skin.append(_sphere(TAG + "fiend_knee_r", 0.090, RL_KNEE, subdivisions=1))
     parts_skin.append(_seg(TAG + "fiend_calf_r", RL_KNEE, RL_ANK, 0.110, 0.062))
-    foot_r = add_box(TAG + "fiend_foot_r", (0.155, 0.095, 0.30), (0.615, 0.355, 0.95),
-                     rotation=(0.50, 0.0, 0.0))
+    parts_skin.append(_sphere(TAG + "fiend_ankle_r", 0.078, RL_ANK, subdivisions=2))
+    foot_r = add_box(TAG + "fiend_foot_r", (0.155, 0.135, 0.34), (0.250, 0.078, 0.665),
+                     rotation=(-0.12, 0.0, 0.0))
     _organic(foot_r, levels=2)
     parts_skin.append(foot_r)
     for i in range(3):
-        base = Vector((0.56 + i * 0.055, 0.305, 1.07))
-        tip = base + Vector((0.01, -0.035, 0.085))
-        toe = _seg(TAG + f"fiend_toe_r_{i}", base, tip, 0.024, 0.008, 1.0, levels=1)
-        parts_other.append((toe, mats["horn"]))
+        base = Vector((0.195 + i * 0.055, 0.045, 0.815))
+        tip = base + Vector((0.01, -0.004, 0.085))
+        parts_other.append((_seg(TAG + f"fiend_toe_r_{i}", tuple(base), tuple(tip),
+                                 0.024, 0.008, 1.0, levels=1), mats["horn"]))
 
+    # trailing leg, heel lifted, driving off the ball of the foot
     parts_skin.append(_seg(TAG + "fiend_thigh_l", LL_HIP, LL_KNEE, 0.142, 0.096))
     parts_skin.append(_sphere(TAG + "fiend_knee_l", 0.088, LL_KNEE, subdivisions=1))
     parts_skin.append(_seg(TAG + "fiend_calf_l", LL_KNEE, LL_ANK, 0.108, 0.060))
-    foot_l = add_box(TAG + "fiend_foot_l", (0.155, 0.105, 0.34), (-0.445, 0.062, -0.695),
-                     rotation=(-0.10, 0.0, 0.0))
+    parts_skin.append(_sphere(TAG + "fiend_ankle_l", 0.078, LL_ANK, subdivisions=2))
+    foot_l = add_box(TAG + "fiend_foot_l", (0.155, 0.125, 0.34), (-0.272, 0.135, -0.735),
+                     rotation=(0.62, 0.0, 0.0))
     _organic(foot_l, levels=2)
     parts_skin.append(foot_l)
     for i in range(3):
-        base = Vector((-0.50 + i * 0.055, 0.045, -0.84))
-        tip = base + Vector((-0.01, -0.005, -0.085))
-        toe = _seg(TAG + f"fiend_toe_l_{i}", base, tip, 0.024, 0.008, 1.0, levels=1)
-        parts_other.append((toe, mats["horn"]))
+        base = Vector((-0.33 + i * 0.055, 0.030, -0.600))
+        tip = base + Vector((-0.01, -0.010, 0.080))
+        parts_other.append((_seg(TAG + f"fiend_toe_l_{i}", tuple(base), tuple(tip),
+                                 0.024, 0.008, 1.0, levels=1), mats["horn"]))
 
-    # back spines — cheap silhouette interest along the hunched spine
+    # back spines along the hunched spine
     for i in range(5):
         t = i / 4.0
         a = Vector(P_HIP).lerp(Vector(P_CHEST), t)
-        a = a + Vector((-0.02, 0.01, -0.145 - 0.02 * math.sin(t * 3.0)))
+        a = a + Vector((-0.02, 0.01, -0.150 - 0.02 * math.sin(t * 3.0)))
         b = a + Vector((-0.01, 0.055 - 0.02 * t, -0.085 - 0.03 * t))
-        sp = _seg(TAG + f"fiend_spine_{i}", a, b, 0.030 - 0.004 * i, 0.006, 1.0, levels=1)
-        parts_other.append((sp, mats["horn"]))
+        parts_other.append((_seg(TAG + f"fiend_spine_{i}", tuple(a), tuple(b),
+                                 0.030 - 0.004 * i, 0.006, 1.0, levels=1), mats["horn"]))
 
-    # ============ the ichor fountain: the key storytelling element ========
+    # ============ the ichor fountain: pulsed, ragged, arterial ===========
     arc_objs = []
-    # main arc: one continuous tapering tube, fat and pressurised at the
-    # wound, thinning and breaking up as it falls
-    n = 13
+
+    def pulsed(i, n, base, taper=0.85, amp=0.42, freq=3.1, phase=0.0):
+        """Radius along a jet: a taper with a pulse beat on top, so the
+        stream looks pumped rather than extruded."""
+        f = i / float(n)
+        return base * (1.0 - f) ** taper * (1.0 + amp * math.sin(f * freq * math.tau + phase)) + 0.012
+
+    # the main jet: solid only while it is under pressure, then it tears
+    # into separate ribbons and finally into pure droplets
+    SOLID = 0.34          # fraction of the arc that is still a stream
+    n = 11
     pts, radii = [], []
     for i in range(n + 1):
         f = i / n
-        pts.append(_fount_point(FOUNT_T * f))
-        radii.append(0.090 * (1.0 - f) ** 0.85 + 0.022)
+        pts.append(_fount_point(FOUNT_T * SOLID * f))
+        radii.append(pulsed(i, n, 0.130, taper=0.75, amp=0.46, freq=3.4))
     pts.insert(0, Vector(STUMP_B) - up * 0.04)
-    radii.insert(0, 0.100)
-    arc_objs.append(_ribbon(TAG + "fiend_spray_main", pts, radii))
-    # secondary jet spitting the other way
-    pts, radii = [], []
-    v = Vector((-0.62, 1.60, -0.34))
-    for i in range(9):
-        t = 1.30 * i / 8.0
-        p = Vector(STUMP_B) + v * t - Vector((0.0, 0.5 * 2.3 * t * t, 0.0))
-        pts.append(p)
-        radii.append(0.046 * (1.0 - i / 8.0) ** 0.8 + 0.011)
-    arc_objs.append(_ribbon(TAG + "fiend_spray_second", pts, radii, bevel_resolution=1))
-    # ichor sheeting down the chest and back from the open neck
-    dribbles = [
-        [Vector((0.24, 1.46, 0.74)), Vector((0.22, 1.28, 0.70)),
-         Vector((0.20, 1.10, 0.60)), Vector((0.17, 0.95, 0.50))],
-        [Vector((0.33, 1.47, 0.66)), Vector((0.37, 1.30, 0.60)),
-         Vector((0.40, 1.16, 0.52))],
-        [Vector((0.22, 1.46, 0.60)), Vector((0.16, 1.30, 0.44)),
-         Vector((0.12, 1.12, 0.33)), Vector((0.09, 0.98, 0.26))],
-    ]
-    for i, pts in enumerate(dribbles):
-        radii = [0.042 - 0.009 * j for j in range(len(pts))]
-        arc_objs.append(_ribbon(TAG + f"fiend_dribble_{i}", pts, radii,
+    radii.insert(0, 0.140)
+    arc_objs.append(_ribbon(TAG + "fiend_spray_main", pts, radii, resolution_u=3))
+
+    rngc = random.Random(5)
+    for i in range(6):
+        t = FOUNT_T * SOLID * (0.18 + 0.82 * i / 5.0)
+        p = _fount_point(t) + Vector((rngc.uniform(-0.04, 0.04), 0.0,
+                                      rngc.uniform(-0.04, 0.04)))
+        cl = _sphere(TAG + f"fiend_clot_{i}", rngc.uniform(0.045, 0.085), tuple(p),
+                     subdivisions=2)
+        cl.scale = (1.0, rngc.uniform(1.1, 1.9), 1.0)
+        arc_objs.append(cl)
+
+    # torn ribbons shearing off the stream for the rest of the arc
+    rngs = random.Random(33)
+    for k in range(10):
+        t0 = FOUNT_T * (SOLID + (1.0 - SOLID) * (k / 10.0)) - rngs.uniform(0.0, 0.04)
+        span = FOUNT_T * (1.0 - SOLID) / 10.0 * rngs.uniform(0.45, 0.95)
+        jitter = Vector((rngs.uniform(-0.12, 0.12), rngs.uniform(-0.08, 0.08),
+                         rngs.uniform(-0.12, 0.12))) * (0.5 + k * 0.20)
+        rp, rr = [], []
+        for j in range(4):
+            tt = t0 + span * j / 3.0
+            rp.append(_fount_point(tt) + jitter * (j / 3.0))
+            rr.append(max(0.006, (0.046 - 0.0032 * k) * (1.0 - 0.55 * j / 3.0)))
+        arc_objs.append(_ribbon(TAG + f"fiend_spray_frag_{k}", rp, rr,
                                 bevel_resolution=1, resolution_u=3))
+
+    # secondary jets off the stump at their own angles — a severed artery
+    # does not spit in one direction only
+    jets = [
+        (Vector((-1.05, 0.55, -0.35)), 0.46, 0.026, 3.0),
+        (Vector((0.80, 0.42, 0.70)), 0.38, 0.021, 3.0),
+    ]
+    for j, (v, span, r0, g) in enumerate(jets):
+        rp, rr = [], []
+        for i in range(9):
+            t = span * i / 8.0
+            p = Vector(STUMP_B) + v * t - Vector((0.0, 0.5 * g * t * t, 0.0))
+            rp.append(p)
+            rr.append(pulsed(i, 8, r0, taper=0.7, amp=0.45, freq=2.2, phase=j * 1.7))
+        arc_objs.append(_ribbon(TAG + f"fiend_spray_jet_{j}", rp, rr,
+                                bevel_resolution=1, resolution_u=3))
+
+    # ichor sheeting down the chest, shoulders and back
+    dribbles = [
+        [Vector((0.06, 1.54, 0.40)), Vector((0.05, 1.36, 0.36)),
+         Vector((0.04, 1.14, 0.28)), Vector((0.02, 0.96, 0.20))],
+        [Vector((0.16, 1.52, 0.30)), Vector((0.22, 1.36, 0.26)),
+         Vector((0.26, 1.18, 0.20)), Vector((0.28, 1.02, 0.14))],
+        [Vector((0.02, 1.52, 0.22)), Vector((-0.04, 1.34, 0.12)),
+         Vector((-0.08, 1.16, 0.04)), Vector((-0.10, 0.98, -0.02))],
+        [Vector((-0.08, 1.50, 0.34)), Vector((-0.16, 1.40, 0.36)),
+         Vector((-0.22, 1.30, 0.34))],
+        [Vector((0.14, 1.50, 0.36)), Vector((0.26, 1.42, 0.26)),
+         Vector((0.33, 1.34, 0.16))],
+        [Vector((0.05, 1.50, 0.14)), Vector((0.02, 1.30, 0.06)),
+         Vector((0.00, 1.10, 0.00)), Vector((-0.02, 0.92, -0.04))],
+    ]
+    for i, dp in enumerate(dribbles):
+        rr = [0.046 - 0.009 * j for j in range(len(dp))]
+        d = _ribbon(TAG + f"fiend_dribble_{i}", dp, rr, bevel_resolution=1, resolution_u=3)
+        d.scale = (1.0, 1.0, 0.55)
+        gore.append(d)
+    # sheets of it clinging to the shoulders and the small of the back
+    for i, (c, sc) in enumerate([((0.07, 1.34, 0.31), (1.5, 1.5, 0.35)),
+                                 ((-0.16, 1.33, 0.33), (1.0, 1.3, 0.32)),
+                                 ((0.27, 1.30, 0.19), (0.9, 1.4, 0.32)),
+                                 ((0.01, 1.22, 0.00), (1.4, 1.6, 0.30))]):
+        sh = _sphere(TAG + f"fiend_sheet_{i}", 0.095, c, subdivisions=2)
+        sh.scale = sc
+        gore.append(sh)
+    # spatter running down the legs
+    rngl = random.Random(91)
+    for i in range(14):
+        lead = i % 2 == 0
+        hip, knee, ank = ((RL_HIP, RL_KNEE, RL_ANK) if lead else (LL_HIP, LL_KNEE, LL_ANK))
+        t = rngl.uniform(0.0, 1.0)
+        a = Vector(hip).lerp(Vector(knee), min(1.0, t * 2.0)) if t < 0.5 else \
+            Vector(knee).lerp(Vector(ank), (t - 0.5) * 2.0)
+        off = Vector((rngl.uniform(-0.09, 0.09), 0.0, rngl.uniform(-0.09, 0.09)))
+        sp = _sphere(TAG + f"fiend_legspat_{i}", rngl.uniform(0.016, 0.040),
+                     tuple(a + off), subdivisions=1)
+        sp.scale = (1.0, rngl.uniform(1.4, 3.0), 0.5)
+        gore.append(sp)
+
     _mat_all(arc_objs, mats["ichor"])
+    _mat_all(gore, mats["ichor"])
 
     # droplets torn off the arc — stretched along their flight direction
     rng = random.Random(21)
     drops = []
-    hot = []
-    for i in range(40):
-        t = rng.uniform(0.15, 2.75)
+    for i in range(62):
+        t = rng.uniform(FOUNT_T * 0.22, 2.95)
         p = _fount_point(t)
-        spread = 0.07 + 0.14 * t
+        spread = 0.06 + 0.17 * t
         p = p + Vector((rng.uniform(-spread, spread),
                         rng.uniform(-spread * 0.7, spread * 0.7),
                         rng.uniform(-spread * 0.8, spread * 0.8)))
-        if p.y < 0.03:
-            p.y = rng.uniform(0.03, 0.12)
-        r = rng.uniform(0.013, 0.040)
+        # keep stretched droplets clear of the floor plane
+        if p.y < 0.12:
+            p.y = rng.uniform(0.12, 0.30)
+        r = rng.uniform(0.013, 0.048)
         d = _sphere(TAG + f"fiend_drop_{i}", r, tuple(p), subdivisions=2)
         tang = (FOUNT_V - Vector((0.0, FOUNT_G * t, 0.0))).normalized()
         d.rotation_euler = Vector((0.0, 1.0, 0.0)).rotation_difference(tang).to_euler()
-        d.scale = (1.0, rng.uniform(1.3, 2.4), 1.0)
-        (hot if i % 5 == 0 else drops).append(d)
+        d.scale = (1.0, rng.uniform(1.4, 2.8), 1.0)
+        (hot if i % 6 == 0 else drops).append(d)
+
     # splash where the arc lands
     land = _fount_point(FOUNT_T)
-    for i in range(6):
+    for i in range(7):
         a = rng.uniform(0, math.tau)
-        rr = rng.uniform(0.05, 0.42)
+        rr2 = rng.uniform(0.05, 0.42)
         sp = add_cylinder(TAG + f"fiend_splat_{i}",
                           rng.uniform(0.05, 0.17), 0.010,
-                          (land.x + math.cos(a) * rr, 0.006, land.z + math.sin(a) * rr),
+                          (land.x + math.cos(a) * rr2, 0.006, land.z + math.sin(a) * rr2),
                           rotation=(math.pi / 2, rng.uniform(0.0, 3.0), 0.0), vertices=12)
         sp.scale = (1.0, rng.uniform(0.6, 1.5), 1.0)
         drops.append(sp)
+
+    # ---- the trail it has already walked: spatter behind the body ----
+    rngt = random.Random(57)
+    for i in range(34):
+        z = -0.9 - 2.9 * (i / 34.0) ** 0.85
+        x = 0.15 * math.sin(z * 1.1) + rngt.uniform(-0.42, 0.42)
+        r = rngt.uniform(0.020, 0.105) * (1.0 - 0.45 * (i / 34.0))
+        sp = add_cylinder(TAG + f"fiend_trail_{i}", r, 0.009, (x, 0.006, z),
+                          rotation=(math.pi / 2, rngt.uniform(0.0, 3.0), 0.0), vertices=10)
+        sp.scale = (rngt.uniform(0.8, 2.1), rngt.uniform(0.7, 1.3), 1.0)
+        drops.append(sp)
+    # bigger pooled footfalls along that trail, where it stood a moment
+    for i in range(6):
+        z = -1.0 - 0.52 * i
+        x = (-0.28 if i % 2 else 0.24) + rngt.uniform(-0.08, 0.08)
+        sp = add_cylinder(TAG + f"fiend_step_{i}", rngt.uniform(0.10, 0.17), 0.010,
+                          (x, 0.006, z), rotation=(math.pi / 2, rngt.uniform(0, 3.0), 0.0),
+                          vertices=12)
+        sp.scale = (1.0, rngt.uniform(1.2, 1.8), 1.0)
+        drops.append(sp)
+    # a few droplets still in the air behind, flicked off by the stride
+    for i in range(10):
+        z = -0.8 - rngt.uniform(0.0, 2.4)
+        d = _sphere(TAG + f"fiend_trailair_{i}", rngt.uniform(0.012, 0.030),
+                    (rngt.uniform(-0.5, 0.5), rngt.uniform(0.05, 0.55), z), subdivisions=1)
+        d.scale = (1.0, rngt.uniform(1.2, 2.0), 1.0)
+        drops.append(d)
+
     _mat_all(drops, mats["ichor"])
     _mat_all(hot, mats["ichor_hot"])
 
@@ -461,7 +621,8 @@ def _build_fiend(mats, parent):
     _mat_all(parts_skin, mats["skin"])
     for obj, mat in parts_other:
         assign_material(obj, mat)
-    everything = parts_skin + [o for o, _ in parts_other] + arc_objs + drops + hot
+    everything = (parts_skin + [o for o, _ in parts_other] + arc_objs
+                  + gore + drops + hot)
     _parent_to(everything, parent)
     return everything
 
@@ -470,8 +631,10 @@ def _build_fiend(mats, parent):
 # After the roll+yaw below the neck stump points roughly toward +X and a
 # little -Z; the pool and the crack web are laid out along that direction.
 HEAD_YAW = math.radians(-78.0)
-# sized so the skull itself is ~0.50 m long (scene_main needs no extra scale)
-HEAD_SCALE = 1.18
+# Deliberately oversized: at true anatomical scale the head disappeared
+# against the floor in the assembled frame, so it is built ~40% larger
+# and reads as a foreground story beat. Skull ends up ~0.72 m long.
+HEAD_SCALE = 1.57
 # the local direction the neck stump points before the head is rolled
 STUMP_DIR_LOCAL = Vector((0.0, -0.60, -0.80)).normalized()
 
@@ -505,8 +668,8 @@ def _build_head_mesh(mats, pivot):
     skin.append(_loft(TAG + "head_skull", skull_rings, levels=3))
 
     # heavy brow ridge sitting over the sockets
-    brow = add_box(TAG + "head_brow", (0.215, 0.052, 0.110), (0.0, 0.062, 0.086),
-                   rotation=(0.20, 0.0, 0.0), bevel_width=0.006, bevel_segments=2)
+    brow = add_box(TAG + "head_brow", (0.205, 0.048, 0.095), (0.0, 0.080, 0.068),
+                   rotation=(0.26, 0.0, 0.0), bevel_width=0.006, bevel_segments=2)
     _organic(brow, levels=2)
     skin.append(brow)
     # occipital ridge running back over the crown
@@ -536,13 +699,13 @@ def _build_head_mesh(mats, pivot):
                        [Vector((s * 0.055, -0.048, 0.112)),
                         Vector((s * 0.060, -0.078, 0.124)),
                         Vector((s * 0.062, -0.102, 0.134))],
-                       [0.015, 0.009, 0.002], bevel_resolution=1, resolution_u=3)
+                       [0.020, 0.012, 0.002], bevel_resolution=1, resolution_u=3)
         other.append((tusk, mats["bone"]))
         tusk2 = _ribbon(TAG + f"head_tusk_l_{s}",
                         [Vector((s * 0.050, -0.040, 0.098)),
                          Vector((s * 0.054, -0.012, 0.108)),
                          Vector((s * 0.056, 0.008, 0.114))],
-                        [0.013, 0.008, 0.002], bevel_resolution=1, resolution_u=3)
+                        [0.018, 0.011, 0.002], bevel_resolution=1, resolution_u=3)
         other.append((tusk2, mats["bone"]))
         for i in range(4):
             f = i / 3.0
@@ -560,12 +723,12 @@ def _build_head_mesh(mats, pivot):
     # ---- horns: continuous tapering sweeps back off the skull ----
     for s in (-1, 1):
         horn = _ribbon(TAG + f"head_horn_{s}", [
-            Vector((s * 0.088, 0.104, 0.000)),
+            Vector((s * 0.090, 0.112, -0.022)),
             Vector((s * 0.102, 0.212, -0.080)),
             Vector((s * 0.110, 0.300, -0.205)),
             Vector((s * 0.108, 0.348, -0.350)),
             Vector((s * 0.100, 0.352, -0.480)),
-        ], [0.048, 0.037, 0.026, 0.016, 0.005])
+        ], [0.054, 0.044, 0.032, 0.019, 0.006])
         other.append((horn, mats["horn"]))
         # cheek spur and brow spike
         sp = _ribbon(TAG + f"head_spur_{s}",
@@ -588,12 +751,12 @@ def _build_head_mesh(mats, pivot):
 
     # ---- eyes: rolled white, a last cyan flicker guttering out ----
     for s in (-1, 1):
-        c = Vector((s * 0.062, 0.030, 0.098))
-        eb = _sphere(TAG + f"head_eye_{s}", 0.037, tuple(c), subdivisions=3)
+        c = Vector((s * 0.072, 0.042, 0.096))
+        eb = _sphere(TAG + f"head_eye_{s}", 0.040, tuple(c), subdivisions=3)
         other.append((eb, mats["eye"]))
         # the iris has rolled up and back — only a sliver of it still shows
-        gdir = Vector((s * 0.35, 0.82, 0.45)).normalized()
-        gl = _sphere(TAG + f"head_flicker_{s}", 0.0165, tuple(c + gdir * 0.029),
+        gdir = Vector((s * 0.86, 0.38, 0.34)).normalized()
+        gl = _sphere(TAG + f"head_flicker_{s}", 0.0260, tuple(c + gdir * 0.032),
                      subdivisions=2)
         gl.scale = (1.3, 0.75, 1.3)
         other.append((gl, mats["eye_flicker"]))
@@ -622,9 +785,9 @@ def _build_head_mesh(mats, pivot):
         a = i / 10.0 * math.tau
         rad = 0.078 + rng.uniform(-0.008, 0.010)
         base = n1 - ndir * 0.018 + (nside * math.cos(a) + nside2 * math.sin(a)) * rad
-        tip = base + ndir * rng.uniform(0.02, 0.06) + (
-            nside * math.cos(a) + nside2 * math.sin(a)) * rng.uniform(0.004, 0.028)
-        rag = _seg(TAG + f"head_rag_{i}", tuple(base), tuple(tip), 0.021, 0.005, 1.0, levels=1)
+        tip = base + ndir * rng.uniform(0.012, 0.038) + (
+            nside * math.cos(a) + nside2 * math.sin(a)) * rng.uniform(0.002, 0.016)
+        rag = _seg(TAG + f"head_rag_{i}", tuple(base), tuple(tip), 0.020, 0.004, 0.42, levels=1)
         other.append((rag, mats["flesh"]))
 
     _mat_all(skin, mats["skin_head"])
@@ -641,7 +804,7 @@ def _build_pool(mats, parent, pool_dir):
     splatters and thin runnels. Sits at Y=0.004 to clear the floor."""
     rng = random.Random(5)
     objs = []
-    y = 0.004
+    y = 0.006          # clear of the floor plane, no z-fighting
 
     # main mass: overlapping flat ellipses -> one irregular organic outline
     blobs = [
@@ -661,7 +824,7 @@ def _build_pool(mats, parent, pool_dir):
         (-0.06, -0.26, 0.12, 1.0, 0.9),
         (0.86, 0.06, 0.09, 1.2, 0.8),
     ]
-    S = 0.72   # overall spread of the pool, in metres of radius scale
+    S = 0.92   # overall spread of the pool, in metres of radius scale
     blobs = [_rot_xz(x * S, z * S, pool_dir) + (r * S, sx, sz)
              for (x, z, r, sx, sz) in blobs]
     for i, (x, z, r, sx, sz) in enumerate(blobs):
@@ -703,12 +866,12 @@ def _build_cracks(mats, parent, pool_dir):
     """Spiderweb fracture radiating in the crystal under the head."""
     rng = random.Random(3)
     objs = []
-    y = 0.0014            # all but flush with the floor plane
+    y = 0.0016            # all but flush with the floor plane
     idx = 0
 
     def bar(x0, z0, ang, length, width):
         nonlocal idx
-        b = add_box(TAG + f"crack_{idx}", (width, 0.0016, length),
+        b = add_box(TAG + f"crack_{idx}", (width, 0.0020, length),
                     (x0 + math.sin(ang) * length * 0.5, y, z0 + math.cos(ang) * length * 0.5),
                     rotation=(0.0, ang, 0.0))
         idx += 1
@@ -718,29 +881,29 @@ def _build_cracks(mats, parent, pool_dir):
         a = i / 17.0 * math.tau + rng.uniform(-0.09, 0.09)
         x, z = _rot_xz(math.cos(a) * 0.05, math.sin(a) * 0.05, pool_dir)
         ang = math.pi / 2 - a
-        total = rng.uniform(0.26, 0.62)
+        total = rng.uniform(0.34, 0.80)
         walked = 0.0
-        w = 0.009
+        w = 0.014
         while walked < total:
-            L = min(rng.uniform(0.10, 0.22), total - walked)
+            L = min(rng.uniform(0.12, 0.26), total - walked)
             bar(x, z, ang, L, w)
             x += math.sin(ang) * L
             z += math.cos(ang) * L
             walked += L
             ang += rng.uniform(-0.34, 0.34)
-            w = max(0.0035, w * 0.78)
+            w = max(0.005, w * 0.80)
             # branch
             if rng.random() < 0.45 and walked < total * 0.8:
                 ba = ang + rng.choice((-1, 1)) * rng.uniform(0.5, 1.0)
-                bar(x, z, ba, rng.uniform(0.07, 0.19), max(0.003, w * 0.8))
+                bar(x, z, ba, rng.uniform(0.10, 0.26), max(0.004, w * 0.8))
 
     # a few concentric chordal cracks tying the web together
     for i in range(9):
         a = rng.uniform(0, math.tau)
-        rr = rng.uniform(0.12, 0.42)
+        rr = rng.uniform(0.18, 0.62)
         bar(math.cos(a) * rr, math.sin(a) * rr,
             math.pi / 2 - a + math.pi / 2 + rng.uniform(-0.3, 0.3),
-            rng.uniform(0.10, 0.30), rng.uniform(0.0035, 0.007))
+            rng.uniform(0.14, 0.38), rng.uniform(0.005, 0.010))
 
     _mat_all(objs, mats["crack"])
     _parent_to(objs, parent)
@@ -763,7 +926,14 @@ def build():
     bpy.context.collection.objects.link(head_root)
     head_root.parent = root
 
-    _build_fiend(mats, fiend_root)
+    # The walk only reads at an angle: a stride along the view axis is
+    # invisible. The body therefore sits on its own Empty, yawed inside
+    # the group, so scene_main's own rotation lands it three-quarter on.
+    body = bpy.data.objects.new(TAG + "fiend_body", None)
+    bpy.context.collection.objects.link(body)
+    body.parent = fiend_root
+    body.rotation_euler = (0.0, FIEND_GAIT_YAW, 0.0)
+    _build_fiend(mats, body)
 
     # the head itself hangs off a pivot that rolls it onto its cheek
     pivot = bpy.data.objects.new(TAG + "head_pivot", None)
@@ -774,7 +944,7 @@ def build():
     # then the yaw turns it. In the default XYZ order the roll is applied
     # about the world axis after the yaw, which faceplants the head.
     pivot.rotation_mode = "ZYX"
-    pivot.rotation_euler = (math.radians(-9.0), HEAD_YAW, math.radians(86.0))
+    pivot.rotation_euler = (math.radians(-9.0), HEAD_YAW, math.radians(62.0))
     pivot.scale = (HEAD_SCALE, HEAD_SCALE, HEAD_SCALE)
     head_objs = _build_head_mesh(mats, pivot)
 
