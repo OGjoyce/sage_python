@@ -1201,9 +1201,9 @@ def _build_ichor_splashes(ichor, mats, rng, torso, horn_surfs):
                 rng.uniform(0.030, 0.065), rng.uniform(0.14, 0.34), mats, rng,
                 drip=0.09 if i % 3 == 0 else 0.0)
     for hi, surf in enumerate(horn_surfs):
-        for i in range(2):
+        for i in range(1):
             _splash(ichor, f"{TAG}ichor_horn{hi}_{i}", surf,
-                    rng.uniform(0.06, 0.45), rng.uniform(0.0, 6.28),
+                    rng.uniform(0.18, 0.45), rng.uniform(0.0, 6.28),
                     rng.uniform(0.035, 0.070), rng.uniform(0.5, 1.1), mats, rng)
         p, _ = surf.at(rng.uniform(0.18, 0.38), -math.pi / 2)
         dr = _tube(f"{TAG}ichor_horndrip{hi}",
@@ -1219,8 +1219,8 @@ def _build_wisps(glow, mats, rng, edge_pts):
     teal vapour peeling off the shoulders, the horns and the burning hem of
     the cape.  Deliberately few and large so they read at distance."""
     seeds = [
-        (Vector((0.44, 2.50, 0.14)), Vector((0.30, 1.0, -0.95)), 0.78, 0.042),
-        (Vector((-0.38, 2.32, 0.00)), Vector((-0.26, 1.0, -1.00)), 0.66, 0.036),
+        (Vector((0.62, 2.42, -0.02)), Vector((0.52, 1.0, -1.05)), 0.80, 0.040),
+        (Vector((-0.56, 2.26, -0.10)), Vector((-0.48, 1.0, -1.05)), 0.68, 0.034),
         (Vector((0.08, 2.38, -0.22)), Vector((0.04, 1.0, -1.15)), 0.84, 0.045),
     ]
     picks = edge_pts[:]
