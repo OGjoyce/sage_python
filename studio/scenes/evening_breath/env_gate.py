@@ -25,7 +25,8 @@ import sys
 
 sys.path.insert(0, "/home/user/sage_python/studio")
 
-import bmesh  # noqa: E402
+import bmesh
+import mathutils  # noqa: E402
 import bpy  # noqa: E402
 import claude_studio as cs  # noqa: E402
 from claude_studio.characters import (  # noqa: E402
@@ -930,7 +931,37 @@ def _build_clouds(mats, rng):
               (math.cos(a) * r, rng.uniform(-14.0, -1.0) - 0.004 * r, math.sin(a) * r),
               size, rng, flat=(0.035, 0.09),
               mat="cloud_lit" if i % 2 else "cloud")
-    return join_parts(parts, "ENV_clouds")
+    # --- KEEP-CLEAR FILTER around the island and the camera -------------
+    #
+    # Several of the layers above are placed by polar radius with large
+    # positional jitter AND a large lobe radius on top: a rim billow seeded
+    # at r=26 can be offset by up to its own size in x and z and then span
+    # another ~22 m, so its geometry reaches well inside r=10. The hero
+    # camera stands at (-0.10, 0.95, 8.80), i.e. only 8.8 m from the
+    # origin, so those lobes were swallowing it -- every ray hit cloud a
+    # couple of metres from the lens and the entire frame rendered as a
+    # flat beige wall with the gate, the floor and both heroes behind it.
+    #
+    # Anything that rises near or above the island plane while sitting
+    # close to it is therefore dropped. Low lobes are deliberately NOT
+    # dropped: the "abyss under the glass" layer is close in by design and
+    # is what makes the crystal floor read as glass over a long drop, so
+    # the test is on height, not distance alone.
+    KEEP_CLEAR_R = 30.0     # horizontal radius around the island centre
+    KEEP_CLEAR_Y = -5.0     # lobes reaching above this, inside that radius, go
+    kept, dropped = [], 0
+    for o in parts:
+        top = max((o.matrix_world @ mathutils.Vector(c)).y for c in o.bound_box)
+        near = min(math.hypot((o.matrix_world @ mathutils.Vector(c)).x,
+                              (o.matrix_world @ mathutils.Vector(c)).z)
+                   for c in o.bound_box)
+        if near < KEEP_CLEAR_R and top > KEEP_CLEAR_Y:
+            bpy.data.objects.remove(o, do_unlink=True)
+            dropped += 1
+        else:
+            kept.append(o)
+    print(f"ENV: clouds keep-clear dropped {dropped}, kept {len(kept)}")
+    return join_parts(kept, "ENV_clouds")
 
 
 # ------------------------------------------------------------- build -----
