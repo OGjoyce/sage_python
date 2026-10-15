@@ -1083,10 +1083,12 @@ def _build_axe(parts, glow, ichor, mats, rng):
         parts.append(bind)
 
     # ---- bearded blade: (s along the haft, t outward from it) -----------
-    outline = [(0.32, 0.00), (0.34, 0.16), (0.30, 0.38), (0.19, 0.56),
-               (-0.02, 0.66), (-0.28, 0.67), (-0.50, 0.55), (-0.62, 0.33),
-               (-0.54, 0.12), (-0.36, 0.00)]
-    th0, tmax = 0.070, 0.67
+    # Straight top shoulder out from the haft, a long sweeping cutting arc,
+    # then a hooked beard back to the haft: unmistakably an axe in outline.
+    outline = [(0.34, 0.00), (0.34, 0.30), (0.28, 0.52), (0.12, 0.66),
+               (-0.10, 0.70), (-0.30, 0.66), (-0.46, 0.52), (-0.52, 0.30),
+               (-0.44, 0.10), (-0.26, 0.00)]
+    th0, tmax = 0.070, 0.70
     bm = bmesh.new()
     front, back = [], []
     for (sp, tp) in outline:
@@ -1108,12 +1110,13 @@ def _build_axe(parts, glow, ichor, mats, rng):
     parts.append(blade)
 
     # the honed bit: a bright steel welt that draws the cutting arc
-    arc = [(0.19, 0.56), (0.09, 0.625), (-0.02, 0.66), (-0.15, 0.672),
-           (-0.28, 0.67), (-0.40, 0.625), (-0.50, 0.55), (-0.57, 0.45)]
+    arc = [(0.28, 0.52), (0.20, 0.60), (0.12, 0.66), (0.00, 0.695),
+           (-0.10, 0.70), (-0.21, 0.685), (-0.30, 0.66), (-0.39, 0.59),
+           (-0.46, 0.52)]
     for i in range(len(arc) - 1):
         p0 = T + d * arc[i][0] + o * arc[i][1]
         p1 = T + d * arc[i + 1][0] + o * arc[i + 1][1]
-        e = _strip(f"{TAG}axe_welt{i}", p0, p1, o, 0.034, 0.022)
+        e = _strip(f"{TAG}axe_welt{i}", p0, p1, o, 0.042, 0.026)
         _mat(e, mats["axe_edge"])
         parts.append(e)
 
@@ -1160,8 +1163,8 @@ def _build_axe(parts, glow, ichor, mats, rng):
         _smooth(run, 2)
         ichor.append(run)
 
-    for i, (sp, tp) in enumerate([(0.12, 0.60), (-0.04, 0.66), (-0.28, 0.67),
-                                  (-0.46, 0.57), (-0.58, 0.40)]):
+    for i, (sp, tp) in enumerate([(0.14, 0.64), (-0.04, 0.70), (-0.24, 0.685),
+                                  (-0.40, 0.585), (-0.50, 0.44)]):
         base = T + d * sp + o * tp
         ln = rng.uniform(0.26, 0.52)
         dr = _tube(f"{TAG}axe_drip{i}",
