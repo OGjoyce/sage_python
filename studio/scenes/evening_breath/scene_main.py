@@ -98,7 +98,12 @@ PROP_SUBROOTS = {
     # occluded; and at 19 m it still sits ~2.8 m inside the left frame edge
     # instead of being clipped by it, which is what killed the two previous
     # placements.
-    "fiend": {"loc": (-7.20, 0.0, -10.5), "rot_y": 28.0},
+    # NOTE: props_fiend yaws the body 60 deg on its own PROP_fiend_body Empty
+    # inside the group, because a stride along the view axis is invisible.
+    # This rotation ADDS to that, so the effective yaw is 75 deg -- a
+    # three-quarter profile that reads both the stride and the
+    # nothing-above-the-shoulders silhouette.
+    "fiend": {"loc": (-7.20, 0.0, -10.5), "rot_y": 15.0},
 }
 
 # Pulled back from the 7.2 m in CONVENTIONS.md: at 35 mm the Chaos Lord's
