@@ -348,6 +348,9 @@ def build():
     M["eye"], _ = cs.materials.new_principled_material(
         "LYS_eye", base_color=AMBER, roughness=0.18,
         emission_color=(0.780, 0.380, 0.070, 1.0), emission_strength=1.1)
+    M["ichor_wet"], _ = cs.materials.new_principled_material(
+        "LYS_ichor_wet", base_color=(0.018, 0.060, 0.063, 1.0), roughness=0.11,
+        metallic=0.0)
     M["scar"], _ = cs.materials.new_principled_material(
         "LYS_scar_tone", base_color=(0.330, 0.200, 0.140, 1.0), roughness=0.45)
     M["ichor"], _ = cs.materials.new_principled_material(
@@ -659,6 +662,68 @@ def build():
     pommel.parent = blade
     assign_material(pommel, M["gold"])
     P(pommel)
+
+    # ---------------------------------------- demon ichor on the blade ----
+    # She has already used it once: a broken runnel of the fiend's black-teal
+    # blood down the camera-facing flat, heaviest mid-blade and thinning
+    # toward the hilt, drifting to the lower edge where drops gather.  All of
+    # it is built in BLADE-LOCAL space and parented to the blade, so it rides
+    # the weapon's angle; the same LYS_ichor material as the gauntlet smear,
+    # essentially non-emissive, so it reads dark and wet against the glow.
+    BLADE_PROF = ((0.00, 0.034, 0.0110), (0.10, 0.038, 0.0120),
+                  (0.42, 0.031, 0.0095), (0.74, 0.022, 0.0070),
+                  (0.92, 0.012, 0.0040), (1.00, 0.003, 0.0015))
+
+    def _bl_prof(t):
+        t = max(0.0, min(1.0, t))
+        for i in range(len(BLADE_PROF) - 1):
+            lo_, hi_ = BLADE_PROF[i], BLADE_PROF[i + 1]
+            if lo_[0] <= t <= hi_[0]:
+                f = (t - lo_[0]) / (hi_[0] - lo_[0])
+                return (lo_[1] + (hi_[1] - lo_[1]) * f,
+                        lo_[2] + (hi_[2] - lo_[2]) * f)
+        return BLADE_PROF[-1][1], BLADE_PROF[-1][2]
+
+    def _smear(name, t, xf, length_t, width, tilt=0.0, face=1.0, thick=0.0045):
+        """A wet streak lying on the flat of the blade (face=+1 camera side)."""
+        hw, hd = _bl_prof(t)
+        o = _plate(name, (width, length_t * BL, thick),
+                   (xf * hw, -t * BL, face * (hd - thick * 0.40)),
+                   M["ichor_wet"], rot=(0.0, 0.0, tilt), bevel=0.0022, seg=2)
+        o.parent = blade
+        return P(o)
+
+    def _drip(name, t, dims, extra=(0.0, 0.0, 0.0)):
+        """A gathered drop on the lower edge; gravity runs toward the tip."""
+        hw, _hd = _bl_prof(t)
+        o = _organic_box(name, dims,
+                         (hw + extra[0], -t * BL + extra[1], extra[2]),
+                         M["ichor_wet"], levels=2)
+        o.parent = blade
+        return P(o)
+
+    # broken runnel: faint flecks near the hilt, body of it mid-blade
+    for i, (t, xf, ln, w, tl) in enumerate((
+            (0.170, -0.32, 0.038, 0.0065, 5.0),
+            (0.248, 0.14, 0.028, 0.0060, -6.0),
+            (0.378, -0.12, 0.125, 0.0240, 7.0),
+            (0.520, 0.26, 0.158, 0.0285, 6.0),
+            (0.665, 0.46, 0.088, 0.0195, 5.0),
+            (0.792, 0.56, 0.055, 0.0135, 4.0),
+            (0.888, 0.58, 0.036, 0.0080, 3.0))):
+        _smear(f"LYS_blade_ichor_{i}", t, xf, ln, w, tilt=math.radians(tl))
+    # two lighter marks on the reverse flat
+    _smear("LYS_blade_ichor_b0", 0.455, -0.26, 0.080, 0.0120,
+           tilt=math.radians(-6.0), face=-1.0)
+    _smear("LYS_blade_ichor_b1", 0.690, 0.12, 0.052, 0.0090,
+           tilt=math.radians(-4.0), face=-1.0)
+    # drops on the lower edge -- two of them stretched, about to fall
+    _drip("LYS_blade_drop_0", 0.500, (0.013, 0.017, 0.011), (0.004, 0.0, 0.0))
+    _drip("LYS_blade_drop_1", 0.615, (0.018, 0.036, 0.014), (0.005, -0.006, -0.001))
+    _drip("LYS_blade_drop_2", 0.720, (0.011, 0.014, 0.009), (0.003, 0.0, 0.0))
+    _drip("LYS_blade_drop_3", 0.845, (0.015, 0.031, 0.012), (0.004, -0.005, -0.001))
+    # bead gathering at the tip
+    _drip("LYS_blade_drop_tip", 0.950, (0.012, 0.044, 0.010), (-0.003, -0.012, 0.0))
 
     # ------------------------------------- recording shard (left hand) ----
     sh_loc = (l_hand[0] + 0.012, l_hand[1] + 0.012, l_hand[2] + 0.030)

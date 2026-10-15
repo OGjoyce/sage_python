@@ -73,22 +73,32 @@ CRYSTAL = (0.671, 0.788, 0.878)
 # --------------------------------------------------------------------------
 PLACEMENT = {
     "env":   {"module": "env_gate",    "loc": (0.00, 0.0,   0.0), "rot_y": 0.0},
-    "lys":   {"module": "char_lys",    "loc": (-1.90, 0.0,  3.6), "rot_y": 25.0},
+    # Pulled in from the left edge and turned further toward the Chaos Lord:
+    # at x=-1.90 her blade ran off the bottom-left of frame and she read as
+    # facing the camera rather than facing him, which killed the standoff.
+    # +45 deg turns her torso toward him while keeping her face readable.
+    "lys":   {"module": "char_lys",    "loc": (-1.40, 0.0,  3.3), "rot_y": 45.0},
     "chaos": {"module": "char_chaos",  "loc": (2.20, 0.0,   1.5), "rot_y": -30.0},
     "props": {"module": "props_fiend", "loc": (0.00, 0.0,   0.0), "rot_y": 0.0},
 }
 # props_fiend returns two sub-roots that are placed independently
 PROP_SUBROOTS = {
-    # The head group is built ~2.2 m across (the head itself ~1.2 m long),
-    # which next to a 1.85 m Lys read as a whole animal crouching on the
-    # floor rather than a severed head. Scaled to a ~0.5 m skull, which also
-    # brings the ichor pool down to a believable ~0.9 m spread.
-    "head":  {"loc": (0.10, 0.0, 2.95), "rot_y": -12.0, "scale": 0.85},
+    # The head group is now built at true scale in props_fiend (0.505 m
+    # skull, ~1.0 m ichor pool), so no shot-level correction is needed; it
+    # was briefly scaled here while the module built it several times too
+    # large and it read as a crouching animal rather than a severed head.
+    "head":  {"loc": (0.10, 0.0, 2.95), "rot_y": -12.0},
     # Moved further left than the (-7.5, -18) in CONVENTIONS.md: from the
     # camera, that line of sight passes through the left arch leg at x=-4.9
     # and the fiend was completely occluded. -11 clears the leg's outer edge
     # while staying inside the island's 22 m back radius.
-    "fiend": {"loc": (-11.00, 0.0, -17.0), "rot_y": 15.0},
+    # Placed in the clear gap OUTSIDE the left arch leg rather than behind it.
+    # The sightline from the camera to this point crosses the arch plane
+    # (z=-8.6) at x=-6.5, past the leg's -5.5 outer edge, so it is not
+    # occluded; and at 19 m it still sits ~2.8 m inside the left frame edge
+    # instead of being clipped by it, which is what killed the two previous
+    # placements.
+    "fiend": {"loc": (-7.20, 0.0, -10.5), "rot_y": 28.0},
 }
 
 # Pulled back from the 7.2 m in CONVENTIONS.md: at 35 mm the Chaos Lord's
@@ -376,10 +386,38 @@ cs.scene.add_area_light(
     (0.40, -3.20, 2.60), target=(0.40, 0.0, 2.60),
     energy=260.0, size=7.0, color=(1.00, 0.30, 0.10), name="UNDERLOOM_core")
 
+# Lys separation. Her ivory plate was sitting on a warm sky of almost the
+# same value, so her silhouette dissolved into the background. A tight warm
+# backlight placed behind and above her, aimed back toward the camera,
+# draws a hot gold edge down her helmet, pauldron and cloak.
+cs.scene.add_area_light(
+    (-4.60, 3.10, 0.40), target=(-1.40, 1.30, 3.30),
+    energy=240.0, size=2.0, color=(1.00, 0.80, 0.50), name="LYS_backlight")
+
+# The beheaded fiend is the scene's narrative beat and was invisible: dark
+# geometry at 16 m against a dark pillar. This rims it from behind-left so
+# it reads as a semi-silhouette with a lit edge, per the brief.
+cs.scene.add_area_light(
+    (-14.00, 4.20, -16.00), target=(-7.20, 1.40, -10.50),
+    energy=900.0, size=4.0, color=(1.00, 0.72, 0.42), name="FIEND_rim")
+
+# Cold accent on the severed head, so the cyan death-flicker separates it
+# from a floor that is lit warm orange from below. Small and close, kept
+# under the head's eye level so it grazes rather than floods.
+cs.scene.add_area_light(
+    (0.10, 0.55, 4.00), target=(0.10, 0.18, 2.95),
+    energy=14.0, size=0.7, color=TEAL_CRACK, name="HEAD_flicker_fill")
+
 # god-ray spots: narrow cones from behind the pillar line, pointed at camera.
 # These are what the fog turns into visible shafts.
-for i, (sx, sy, sz) in enumerate([(-7.5, 7.0, -9.0), (-3.0, 8.0, -10.0),
-                                  (4.0, 7.5, -9.5), (8.0, 6.5, -8.0)]):
+# These sit BEHIND the arch (which, after the shot-level refit, stands at
+# about z=-8.6) rather than in front of it. That is the whole trick: a spot
+# with nothing between it and the camera lights fog evenly and produces no
+# shaft at all, which is why the first placement at z=-9 gave none. From
+# back here the arch legs, the keystone mass and the flanking pillars chop
+# each cone into distinct beams on their way to the lens.
+for i, (sx, sy, sz) in enumerate([(-9.0, 7.5, -17.0), (-3.5, 9.0, -19.0),
+                                  (3.5, 8.5, -18.0), (9.0, 7.0, -16.0)]):
     ld = bpy.data.lights.new(f"GODRAY_spot_{i}", type="SPOT")
     ld.energy = 900.0
     ld.color = (1.00, 0.76, 0.42)
@@ -389,7 +427,7 @@ for i, (sx, sy, sz) in enumerate([(-7.5, 7.0, -9.0), (-3.0, 8.0, -10.0),
     lo = bpy.data.objects.new(f"GODRAY_spot_{i}", ld)
     lo.location = (sx, sy, sz)
     bpy.context.collection.objects.link(lo)
-    cs.scene.look_at(lo, (sx * 0.25, 0.6, 6.5))
+    cs.scene.look_at(lo, (sx * 0.22, 0.8, 7.0))
 
 
 # --------------------------------------------------------------------------
@@ -463,8 +501,80 @@ def build_fog():
     return dom
 
 
+def build_chaos_aura():
+    """An "aura maligna" around the Chaos Lord: a dark teal volume clinging
+    to his body, densest at his feet and thinning upward, so he looks like
+    he is standing in something rather than lit by something.
+
+    Deliberately a separate, bounded volume rather than more scene fog --
+    density is ~8x the ambient haze and it has to stop at his silhouette,
+    which a global volume cannot do. Density falls off with distance from
+    the ellipsoid centre, computed in OBJECT space (-0.5..0.5 across the
+    cube regardless of its world scale), which is exactly the coordinate
+    space the main fog could NOT use for a world-height gradient but is the
+    right one for a normalised radial falloff.
+    """
+    cx, cz = PLACEMENT["chaos"]["loc"][0], PLACEMENT["chaos"]["loc"][2]
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(cx, 1.45, cz))
+    dom = bpy.context.active_object
+    dom.name = "ATMO_chaos_aura"
+    dom.scale = (3.40, 4.20, 3.40)
+    dom.display_type = "WIRE"
+    dom.visible_shadow = False
+
+    mat = bpy.data.materials.new("ATMO_chaos_aura")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+
+    vol = nt.nodes.new("ShaderNodeVolumePrincipled")
+    vol.inputs["Color"].default_value = (0.055, 0.180, 0.195, 1.0)
+    vol.inputs["Anisotropy"].default_value = 0.25
+    vol.inputs["Emission Color"].default_value = (0.047, 0.420, 0.450, 1.0)
+    vol.inputs["Emission Strength"].default_value = 0.045
+
+    tex = nt.nodes.new("ShaderNodeTexCoord")
+    dist = nt.nodes.new("ShaderNodeVectorMath")
+    dist.operation = "LENGTH"
+    fall = nt.nodes.new("ShaderNodeMapRange")
+    fall.inputs["From Min"].default_value = 0.08
+    fall.inputs["From Max"].default_value = 0.50
+    fall.inputs["To Min"].default_value = 0.034
+    fall.inputs["To Max"].default_value = 0.0
+    fall.clamp = True
+
+    # creeping, uneven -- a clean radial gradient reads as a lit sphere
+    noise = nt.nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 2.4
+    noise.inputs["Detail"].default_value = 5.0
+    gain = nt.nodes.new("ShaderNodeMapRange")
+    gain.inputs["To Min"].default_value = 0.35
+    gain.inputs["To Max"].default_value = 1.65
+    gain.clamp = True
+    dens = nt.nodes.new("ShaderNodeMath")
+    dens.operation = "MULTIPLY"
+
+    nt.links.new(tex.outputs["Object"], dist.inputs[0])
+    nt.links.new(dist.outputs["Value"], fall.inputs["Value"])
+    nt.links.new(noise.outputs["Fac"], gain.inputs["Value"])
+    nt.links.new(fall.outputs["Result"], dens.inputs[0])
+    nt.links.new(gain.outputs["Result"], dens.inputs[1])
+    nt.links.new(dens.outputs["Value"], vol.inputs["Density"])
+    nt.links.new(vol.outputs["Volume"], out.inputs["Volume"])
+    dom.data.materials.append(mat)
+
+    # a low cold source inside the aura so it is lit from within
+    cs.scene.add_area_light(
+        (cx, 0.55, cz + 0.9), target=(cx, 2.10, cz),
+        energy=55.0, size=1.8, color=TEAL_CRACK, name="CHAOS_aura_core")
+    return dom
+
+
 if not _flag("--nofog"):
     build_fog()
+    if "chaos" in loaded:
+        build_chaos_aura()
 
 
 # --------------------------------------------------------------------------
