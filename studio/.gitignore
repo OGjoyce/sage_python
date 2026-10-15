@@ -6,3 +6,7 @@ renders/
 exports/
 requests/
 agent/sessions/
+
+# per-module preview renders from scenes/*/_test_module.py
+scenes/**/_test_*.png
+scenes/**/evening_breath_*.png
