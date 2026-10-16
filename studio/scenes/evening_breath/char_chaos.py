@@ -47,7 +47,8 @@ import sys
 sys.path.insert(0, "/home/user/sage_python/studio")
 
 import bpy  # noqa: E402
-import bmesh  # noqa: E402
+import bmesh
+import mathutils  # noqa: E402
 from mathutils import Vector  # noqa: E402
 
 import claude_studio as cs  # noqa: E402
@@ -512,6 +513,14 @@ AXE_T = Vector((0.520, 2.460, 0.060))                 # head, on the shoulder
 AXE_D = Vector((-0.100, 1.070, -0.410)).normalized()  # butt -> head
 AXE_B = AXE_T - AXE_D * 2.20
 AXE_O = Vector((0.9946, 0.0752, -0.0706)).normalized()
+# The blade plane is spanned by AXE_D (haft) and AXE_O, with AXE_N its face
+# normal. Unrolled, AXE_N works out to roughly (0.04, 0.36, 0.93) -- pointing
+# almost straight down the lens -- so the blade rendered as a dark oval disc
+# and read as a frying pan rather than an axe. Rolling AXE_O about the haft
+# axis swings that normal toward +X, which (after the figure's -30 deg turn)
+# puts the blade at a steep angle to camera and shows its cutting profile.
+AXE_ROLL = math.radians(75.0)
+AXE_O = (mathutils.Matrix.Rotation(AXE_ROLL, 4, AXE_D) @ AXE_O).normalized()
 AXE_N = AXE_O.cross(AXE_D).normalized()
 
 RING_Y = 0.4 * UU         # 0.024 -- the aura sits just off the crystal floor
@@ -897,8 +906,10 @@ def _build_armor(parts, glow, mats, rng, torso, arms, legs):
                     (rr, rr * 1.05, rr * 0.45), subdiv=2)
         _mat(sh_, m)
         glow.append(sh_)
-    # the dim halo ring, radius 9 u = 0.529 m, standing round the core
-    halo = _annulus(TAG + "crack_corehalo", 9 * UU, 0.026, 0.0, thick=0.018, segs=48)
+    # The source draws this at mul=0.20 -- almost invisible. At 9 u (0.529 m)
+    # it rings his whole chest, and the shot's emission grade lifts it into a
+    # bright green hoop that reads as a prop, not a glow. Hug the core.
+    halo = _annulus(TAG + "crack_corehalo", 3.4 * UU, 0.018, 0.0, thick=0.013, segs=40)
     halo.rotation_euler = (math.radians(90.0), 0.0, 0.0)
     halo.location = (core_c.x, core_c.y, core_c.z - 0.185)
     _mat(halo, mats["crack_dim"])
@@ -935,14 +946,14 @@ def _build_armor(parts, glow, mats, rng, torso, arms, legs):
         lean = 0.10 if side == "l" else -0.06
         pl = add_box(TAG + "paul_" + side, (PLATE_X - TOR_HW, 6 * UU, 2 * TOR_HD * 1.05),
                      (cxp, yp + (0.03 if side == "l" else -0.02), 0.215),
-                     rotation=(0.26, 0.0, sx * -0.62 + lean * 0.0),
+                     rotation=(0.26, 0.0, sx * -1.02 + lean * 0.0),
                      bevel_width=0.024, bevel_segments=3)
         _mat(pl, AH if side == "l" else A)
         parts.append(pl)
         cap = add_box(TAG + "paulcap_" + side, (PLATE_X - TOR_HW + 0.05, 0.070, 2 * TOR_HD * 1.12),
                       (cxp - sx * 0.015, yp + 6 * UU * 0.5 + 0.030
                        + (0.03 if side == "l" else -0.02), 0.175),
-                      rotation=(0.26, 0.0, sx * -0.62), bevel_width=0.016, bevel_segments=3)
+                      rotation=(0.26, 0.0, sx * -1.02), bevel_width=0.016, bevel_segments=3)
         _mat(cap, A)
         parts.append(cap)
         trim = add_box(TAG + "trim_" + side, (0.030, 6 * UU + 0.10, 2 * TOR_HD * 1.12),
@@ -1074,12 +1085,17 @@ def _build_aura(aura, mats, rng):
     # and rise straight up, tapering to nothing.  Anything that curls across
     # the body reads as cable, not fire, so sway is kept near zero.
     FPH = (0.0, 3.5, 7.2, 11.0, 15.3, 1.8, 5.5, 9.0, 13.7, 17.1)
-    FR = (0.47, 0.60, 0.52, 0.66, 0.49, 0.58, 0.63, 0.46, 0.55, 0.68)
-    max_fh = 27 * u
-    for i in range(10):
-        phase = ((FPH[i] + 2.0) % 20.0) / 20.0       # staggered, never zero
+    FR = (0.62, 0.75, 0.67, 0.80, 0.64, 0.73, 0.78, 0.61, 0.70, 0.82)
+    # 14 u = 0.82 m, not the source's 27 u. The game views this hero from a
+    # near-orthographic distance where tall tongues sit beside him; our 35 mm
+    # lens at 7 m puts anything above knee height visually ON his torso, where
+    # it reads as cable wrapped round the body. Keep the fire at his legs.
+    max_fh = 14 * u
+    N_TONGUES = 7          # 10 at this scale reads as a thicket, not a fire
+    for i in range(N_TONGUES):
+        phase = 0.45 + ((FPH[i] + 2.0) % 20.0) / 20.0 * 0.55   # never stubby
         fh = phase * max_fh
-        ang = i * (math.pi * 2.0 / 10.0) + 0.37
+        ang = i * (math.pi * 2.0 / N_TONGUES) + 0.37
         fx, fz = math.cos(ang) * FR[i], math.sin(ang) * FR[i]
         fw = 0.040 + 0.013 * math.sin(i * 1.9)
 
@@ -1378,23 +1394,30 @@ def build():
     _build_aura(aura, mats, rng)
 
     # ---- fel-green fissures over the bare corrupted flesh ---------------
+    # Crack density and width, halved and then some. Proved by rendering the
+    # figure with this whole group hidden: without it the body reads exactly
+    # as intended -- purple-black flesh, bone ribcage, bone skull -- and with
+    # the previous 7/4/4/4/2 veins at 0.008-0.018 m it read as green vines
+    # wrapped round him. A 1.8 cm strip is already thin at this scale; what
+    # makes it rope-like is the emission blooming it, so the fix is far fewer
+    # and finer veins, not a different material.
     cracks = []
-    _veins(cracks, "torso", torso_surf, rng, mats, 7, nseg=(6, 10), seg_len=0.110,
-           width=(0.008, 0.018), t_range=(0.06, 0.95), hot=0.18, branch_p=0.55)
+    _veins(cracks, "torso", torso_surf, rng, mats, 3, nseg=(4, 7), seg_len=0.110,
+           width=(0.004, 0.009), t_range=(0.06, 0.95), hot=0.18, branch_p=0.28)
     for side, s in arm_surfs.items():
-        _veins(cracks, f"arm{side}", s, rng, mats, 4, nseg=(5, 9), seg_len=0.100,
-               width=(0.005, 0.012), t_range=(0.18, 0.95), hot=0.14, branch_p=0.45)
+        _veins(cracks, f"arm{side}", s, rng, mats, 2, nseg=(4, 6), seg_len=0.100,
+               width=(0.003, 0.006), t_range=(0.18, 0.95), hot=0.14, branch_p=0.22)
     for side, s in leg_surfs.items():
-        _veins(cracks, f"leg{side}", s, rng, mats, 4, nseg=(6, 10), seg_len=0.110,
-               width=(0.005, 0.013), t_range=(0.06, 0.95), hot=0.12, branch_p=0.45)
+        _veins(cracks, f"leg{side}", s, rng, mats, 2, nseg=(4, 7), seg_len=0.110,
+               width=(0.003, 0.007), t_range=(0.06, 0.95), hot=0.12, branch_p=0.22)
     for i, s in enumerate(horn_surfs):
-        _veins(cracks, f"horn{i}", s, rng, mats, 1, nseg=(3, 5), seg_len=0.120,
-               width=(0.004, 0.009), t_range=(0.05, 0.50), hot=0.0, branch_p=0.15)
+        _veins(cracks, f"horn{i}", s, rng, mats, 1, nseg=(2, 3), seg_len=0.120,
+               width=(0.002, 0.005), t_range=(0.05, 0.50), hot=0.0, branch_p=0.0)
     skull_s, jaw_s = skin_surfs
-    _veins(cracks, "skull", skull_s, rng, mats, 4, nseg=(3, 6), seg_len=0.085,
-           width=(0.004, 0.010), t_range=(0.12, 0.92), hot=0.34, branch_p=0.45)
-    _veins(cracks, "jaw", jaw_s, rng, mats, 2, nseg=(3, 5), seg_len=0.070,
-           width=(0.003, 0.008), t_range=(0.10, 0.90), hot=0.30, branch_p=0.35)
+    _veins(cracks, "skull", skull_s, rng, mats, 2, nseg=(2, 4), seg_len=0.085,
+           width=(0.002, 0.005), t_range=(0.12, 0.92), hot=0.34, branch_p=0.20)
+    _veins(cracks, "jaw", jaw_s, rng, mats, 1, nseg=(2, 3), seg_len=0.070,
+           width=(0.002, 0.004), t_range=(0.10, 0.90), hot=0.30, branch_p=0.0)
 
     out = {
         "body": join_parts(body, TAG + "body"),
