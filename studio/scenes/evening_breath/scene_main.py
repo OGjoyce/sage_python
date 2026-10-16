@@ -75,6 +75,14 @@ SUN_ORANGE = (1.000, 0.478, 0.180)
 GOLD_LAW = (1.000, 0.816, 0.290)
 UNDERLOOM = (1.000, 0.250, 0.055)
 TEAL_CRACK = (0.149, 0.898, 0.937)
+# CraftWar's canonical DIRE hero palette (src/gfx/models3d/dire_hero.cpp).
+# "Chaos Lord" is DIRE's tier-1 hero name in their data.h, so this scene's
+# Chaos Lord and their Ah Puch are the same character -- his glow is fel-GREEN
+# (DI_GLOW 0x80FF30), not the cyan this scene started with. Lights motivated
+# by his cracks and eyes follow that, or the character stops matching the game.
+FEL_GREEN = (0.502, 1.000, 0.188)   # DI_GLOW
+FEL_HOT = (0.933, 1.000, 0.565)     # DI_HOT
+CRUPT_PURPLE = (0.314, 0.094, 0.439)  # DI_CRUPT
 CRYSTAL = (0.671, 0.788, 0.878)
 
 # --------------------------------------------------------------------------
@@ -396,7 +404,7 @@ cs.scene.add_area_light(
 # cyan accent from the Chaos Lord's cracks -- motivated practical fill
 cs.scene.add_area_light(
     (3.6, 1.7, 2.6), target=(1.6, 1.8, 2.0),
-    energy=70.0, size=2.2, color=TEAL_CRACK, name="CHAOS_crack_fill")
+    energy=70.0, size=2.2, color=FEL_GREEN, name="CHAOS_crack_fill")
 
 # cold fill from camera-right-high so the ivory plate does not go to black
 cs.scene.add_area_light(
@@ -572,9 +580,9 @@ def build_chaos_aura():
     out = nt.nodes.new("ShaderNodeOutputMaterial")
 
     vol = nt.nodes.new("ShaderNodeVolumePrincipled")
-    vol.inputs["Color"].default_value = (0.055, 0.180, 0.195, 1.0)
+    vol.inputs["Color"].default_value = (0.075, 0.150, 0.055, 1.0)
     vol.inputs["Anisotropy"].default_value = 0.25
-    vol.inputs["Emission Color"].default_value = (0.047, 0.420, 0.450, 1.0)
+    vol.inputs["Emission Color"].default_value = (0.180, 0.420, 0.070, 1.0)
     vol.inputs["Emission Strength"].default_value = 0.045
 
     tex = nt.nodes.new("ShaderNodeTexCoord")
@@ -610,7 +618,7 @@ def build_chaos_aura():
     # a low cold source inside the aura so it is lit from within
     cs.scene.add_area_light(
         (cx, 0.55, cz + 0.9), target=(cx, 2.10, cz),
-        energy=55.0, size=1.8, color=TEAL_CRACK, name="CHAOS_aura_core")
+        energy=55.0, size=1.8, color=FEL_GREEN, name="CHAOS_aura_core")
     return dom
 
 
