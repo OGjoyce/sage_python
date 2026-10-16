@@ -82,7 +82,10 @@ def _materials():
 
     # fel-dark corrupted flesh, purple-black, kept glossy so the key light
     # behind still draws a hard specular edge along every starved muscle.
-    mat, bsdf = nm(TAG + "flesh", base_color=DI_FLESH, roughness=0.26, metallic=0.10)
+    # pushed well below the literal DI_FLESH value so his overall value
+    # sits clearly darker than Lys's ivory-and-gold in the same frame.
+    mat, bsdf = nm(TAG + "flesh", base_color=(0.048, 0.029, 0.060, 1.0),
+                   roughness=0.28, metallic=0.10)
     cs.materials.add_noise_bump(mat, bsdf, scale=26.0, detail=6.0, strength=0.11)
     M["skin"] = mat
 
@@ -109,11 +112,11 @@ def _materials():
                           roughness=0.32, metallic=0.25)
     M["steel"], _ = nm(TAG + "steel", base_color=(0.210, 0.200, 0.172, 1.0),
                        roughness=0.40, metallic=0.55)
-    bmat, bbsdf = nm(TAG + "bone", base_color=DI_BONE, roughness=0.50)
+    bmat, bbsdf = nm(TAG + "bone", base_color=(0.640, 0.604, 0.486, 1.0), roughness=0.52)
     cs.materials.add_noise_bump(bmat, bbsdf, scale=34.0, detail=5.0, strength=0.10)
     M["bone"] = bmat
-    M["bone_dim"], _ = nm(TAG + "bone_dim", base_color=(0.470, 0.440, 0.350, 1.0),
-                          roughness=0.52)
+    M["bone_dim"], _ = nm(TAG + "bone_dim", base_color=(0.300, 0.280, 0.222, 1.0),
+                          roughness=0.55)
     M["cloth"], _ = nm(TAG + "cape_cloth", base_color=(0.026, 0.017, 0.032, 1.0),
                        roughness=0.56)
     M["mouth"], _ = nm(TAG + "maw", base_color=(0.018, 0.010, 0.018, 1.0), roughness=0.55)
@@ -651,12 +654,12 @@ def _build_body(parts, glow, mats, rng):
     horn_surfs = []
     for side, sx, st in (("l", 1.0, 1.0), ("r", -1.0, 0.96)):
         pts = [
-            (0.03 + sx * 0.330, 2.440, 0.090),
-            (0.03 + sx * 0.432, 2.572, 0.070),
-            (0.03 + sx * 0.529, 2.735, 0.020 * st),   # end of segment 1
-            (0.03 + sx * 0.487, 2.868, -0.060 * st),  # segment 2 turns back in
-            (0.03 + sx * 0.368, 2.962, -0.110 * st),
-            (0.03 + sx * 0.265, 3.000, -0.130 * st),
+            (0.03 + sx * 0.318, 2.432, 0.085),
+            (0.03 + sx * 0.400, 2.560, -0.020 * st),
+            (0.03 + sx * 0.452, 2.700, -0.195 * st),  # end of segment 1: up, back
+            (0.03 + sx * 0.428, 2.832, -0.400 * st),  # segment 2 sweeps back in
+            (0.03 + sx * 0.356, 2.946, -0.565 * st),
+            (0.03 + sx * 0.296, 3.000, -0.700 * st),
         ]
         rad = [0.088, 0.076, 0.060, 0.043, 0.026, 0.007]
         horn = _tube(TAG + "horn_" + side, pts, rad, sides=8)
@@ -810,8 +813,8 @@ def _build_legs(parts, mats, rng):
 
         kx, ky, kz = pts[ki]
         knob = _blob(f"{TAG}kneeknob_{side}", (kx, ky, kz + 0.040),
-                     (0.068, 0.060, 0.058), subdiv=2)
-        _mat(knob, mats["bone"])
+                     (0.062, 0.055, 0.053), subdiv=2)
+        _mat(knob, mats["bone_dim"])
         _smooth(knob, 1)
         parts.append(knob)
         hx, hy, hz = pts[5]
@@ -870,14 +873,14 @@ def _build_armor(parts, glow, mats, rng, torso, arms, legs):
         return o
 
     # ---- FOUR BONE RIB BANDS at 21, 24, 27, 30 world units --------------
+    # Narrow bands with clear dark DI_FLESH gaps between them, wrapping only
+    # the front of the ribcage.  Bone ivory, never emissive -- the heart-core
+    # is the only thing on this body that glows.
     for i, t in enumerate((0.171, 0.341, 0.508, 0.674)):
-        shell(f"rib{i}", torso, t - 0.030, t + 0.030, -1.32, 1.32,
-              gap0=0.010, thick=0.026, nt=2, na=11, m=mats["bone"], bevel=0.006)
-    shell("sternum", torso, 0.150, 0.700, -0.080, 0.080,
-          gap0=0.013, thick=0.022, nt=7, na=2, m=mats["bone_dim"], bevel=0.005)
-    for i, t in enumerate((0.770, 0.855)):
-        shell(f"ribup{i}", torso, t - 0.024, t + 0.024, -1.00, 1.00,
-              gap0=0.009, thick=0.021, nt=2, na=9, m=mats["bone_dim"], bevel=0.005)
+        shell(f"rib{i}", torso, t - 0.017, t + 0.017, -0.86, 0.86,
+              gap0=0.009, thick=0.020, nt=2, na=9, m=mats["bone"], bevel=0.005)
+    shell("sternum", torso, 0.150, 0.700, -0.055, 0.055,
+          gap0=0.011, thick=0.017, nt=7, na=2, m=mats["bone_dim"], bevel=0.004)
 
     # ---- HOLLOW FEL-CORE: the pulsing orb where a heart should be -------
     cp, cn = torso.at(0.341, 0.0)
@@ -917,7 +920,7 @@ def _build_armor(parts, glow, mats, rng, torso, arms, legs):
         bead = _blob(f"{TAG}rattle_bead{i}",
                      (cbot.x + ox, cbot.y - 0.028 - abs(ox) * 0.12, cbot.z + 0.004),
                      (0.025, 0.031, 0.023), subdiv=2)
-        _mat(bead, mats["bone"])
+        _mat(bead, mats["bone_dim"])
         _smooth(bead, 1)
         parts.append(bead)
     lit = _blob(TAG + "rattle_felbead", (cbot.x, cbot.y - 0.028, cbot.z + 0.020),
@@ -927,30 +930,30 @@ def _build_armor(parts, glow, mats, rng, torso, arms, legs):
 
     # ---- SHOULDER PLATES: 2 u thick slabs out to 12 u, teal-trimmed -----
     for side, sx in (("l", 1.0), ("r", -1.0)):
-        cxp = sx * (TOR_HW + PLATE_X) * 0.5
-        yp = (SHOULDER_Y + (SHOULDER_Y - 6 * UU)) * 0.5
+        cxp = sx * (TOR_HW + PLATE_X) * 0.47
+        yp = (SHOULDER_Y + (SHOULDER_Y - 6 * UU)) * 0.5 + 0.045
         lean = 0.10 if side == "l" else -0.06
         pl = add_box(TAG + "paul_" + side, (PLATE_X - TOR_HW, 6 * UU, 2 * TOR_HD * 1.05),
-                     (cxp, yp + (0.03 if side == "l" else -0.02), 0.175),
-                     rotation=(0.05, 0.0, sx * -0.34 + lean * 0.0),
-                     bevel_width=0.022, bevel_segments=3)
+                     (cxp, yp + (0.03 if side == "l" else -0.02), 0.215),
+                     rotation=(0.26, 0.0, sx * -0.62 + lean * 0.0),
+                     bevel_width=0.024, bevel_segments=3)
         _mat(pl, AH if side == "l" else A)
         parts.append(pl)
         cap = add_box(TAG + "paulcap_" + side, (PLATE_X - TOR_HW + 0.05, 0.070, 2 * TOR_HD * 1.12),
                       (cxp - sx * 0.015, yp + 6 * UU * 0.5 + 0.030
                        + (0.03 if side == "l" else -0.02), 0.175),
-                      rotation=(0.05, 0.0, sx * -0.34), bevel_width=0.016, bevel_segments=3)
+                      rotation=(0.26, 0.0, sx * -0.62), bevel_width=0.016, bevel_segments=3)
         _mat(cap, A)
         parts.append(cap)
         trim = add_box(TAG + "trim_" + side, (0.030, 6 * UU + 0.10, 2 * TOR_HD * 1.12),
                        (sx * PLATE_X, yp - 0.030 + (0.03 if side == "l" else -0.02), 0.175),
-                       rotation=(0.05, 0.0, sx * -0.34), bevel_width=0.006)
+                       rotation=(0.26, 0.0, sx * -0.62), bevel_width=0.006)
         _mat(trim, mats["accent"])
         glow.append(trim)
         trim2 = add_box(TAG + "trimtop_" + side, (PLATE_X - TOR_HW + 0.04, 0.026, 0.040),
                         (cxp, yp + 6 * UU * 0.5 + 0.055 + (0.03 if side == "l" else -0.02),
                          0.175 + TOR_HD * 1.05),
-                        rotation=(0.05, 0.0, sx * -0.34), bevel_width=0.005)
+                        rotation=(0.26, 0.0, sx * -0.62), bevel_width=0.005)
         _mat(trim2, mats["accent"])
         glow.append(trim2)
 
@@ -1066,33 +1069,37 @@ def _build_aura(aura, mats, rng):
         aura.append(foot)
 
     # ---- DENSE FEL-FIRE COLUMN: 10 staggered flame tongues --------------
-    FX = (0.0, 2.5, -2.0, 4.0, -3.5, 1.5, -1.0, 3.0, -4.0, 0.5)
-    FZ = (0.0, -2.0, 3.0, -1.5, 2.5, 4.0, -3.0, 0.5, -1.0, -4.0)
+    # Ten tongues standing on the ground AROUND his feet, not through him:
+    # they sit on a ring just outside the torso footprint (half-width 0.353)
+    # and rise straight up, tapering to nothing.  Anything that curls across
+    # the body reads as cable, not fire, so sway is kept near zero.
     FPH = (0.0, 3.5, 7.2, 11.0, 15.3, 1.8, 5.5, 9.0, 13.7, 17.1)
+    FR = (0.47, 0.60, 0.52, 0.66, 0.49, 0.58, 0.63, 0.46, 0.55, 0.68)
     max_fh = 27 * u
     for i in range(10):
         phase = ((FPH[i] + 2.0) % 20.0) / 20.0       # staggered, never zero
         fh = phase * max_fh
-        fx, fz = FX[i] * 1.26 * u, FZ[i] * 1.26 * u
-        fw = 0.026 + 0.011 * math.sin(i * 0.7) + 0.006 * ((i * 7) % 5)
+        ang = i * (math.pi * 2.0 / 10.0) + 0.37
+        fx, fz = math.cos(ang) * FR[i], math.sin(ang) * FR[i]
+        fw = 0.040 + 0.013 * math.sin(i * 1.9)
 
-        def tongue(nm, height, w, m, lean, segs=6):
+        def tongue(nm, height, w, m, segs=6):
             pts, rad = [], []
             for k in range(segs):
                 f = k / (segs - 1.0)
-                sway = math.sin(f * 3.4 + i * 1.3) * 0.085 * height
-                pts.append((fx + sway * lean, y + height * f, fz + sway * 0.55 * lean))
-                rad.append(w * (1.0 - f) ** 2.1 + 0.0015)
+                drift = f * f * 0.055           # a slight lean outward, no curl
+                pts.append((fx * (1.0 + drift), y + height * f, fz * (1.0 + drift)))
+                rad.append(w * (1.0 - f) ** 1.9 + 0.0015)
             o = _tube(nm, pts, rad, sides=6)
             _mat(o, m)
             _smooth(o, 1)
             aura.append(o)
 
-        tongue(f"{TAG}aura_flame_out{i}", fh, fw * 1.30, mats["crack_dim"], 1.0)
-        tongue(f"{TAG}aura_flame_mid{i}", fh * 0.75, fw * 0.92, mats["mid"], 0.8)
-        tongue(f"{TAG}aura_flame_core{i}", fh * 0.50, fw * 0.58, mats["hot"], 0.6)
+        tongue(f"{TAG}aura_flame_out{i}", fh, fw * 1.30, mats["crack_dim"])
+        tongue(f"{TAG}aura_flame_mid{i}", fh * 0.72, fw * 0.90, mats["mid"])
+        tongue(f"{TAG}aura_flame_core{i}", fh * 0.46, fw * 0.55, mats["hot"])
         em = _blob(f"{TAG}aura_flamefoot{i}", (fx, y + 0.016, fz),
-                   (0.024, 0.017, 0.024), subdiv=2)
+                   (0.028, 0.019, 0.028), subdiv=2)
         _mat(em, mats["hot"])
         aura.append(em)
 
@@ -1177,7 +1184,7 @@ def _build_axe(parts, glow, ichor, mats, rng):
         poly.use_smooth = True
     parts.append(haft)
     cap = _tube(TAG + "axe_buttcap", [B - d * 0.045, B + d * 0.055], [0.049, 0.054], sides=10)
-    _mat(cap, mats["bone"])
+    _mat(cap, mats["bone_dim"])
     parts.append(cap)
     for i in range(5):
         p = L_WRI + d * (-0.17 + i * 0.085)
@@ -1185,10 +1192,12 @@ def _build_axe(parts, glow, ichor, mats, rng):
         _mat(bind, mats["bone_dim"])
         parts.append(bind)
 
-    outline = [(0.31, 0.00), (0.31, 0.27), (0.25, 0.47), (0.11, 0.60),
-               (-0.09, 0.635), (-0.27, 0.60), (-0.42, 0.47), (-0.47, 0.27),
-               (-0.40, 0.09), (-0.24, 0.00)]
-    th0, tmax = 0.056, 0.635
+    # straight top shoulder out from the haft, a long cutting arc, then a
+    # deep hooked beard dropping below: unmistakably an axe in outline.
+    outline = [(0.34, 0.00), (0.355, 0.38), (0.295, 0.565), (0.135, 0.650),
+               (-0.095, 0.675), (-0.325, 0.620), (-0.520, 0.495),
+               (-0.690, 0.300), (-0.590, 0.115), (-0.290, 0.015)]
+    th0, tmax = 0.034, 0.675
     bm = bmesh.new()
     front, back = [], []
     for (sp, tp) in outline:
@@ -1209,24 +1218,24 @@ def _build_axe(parts, glow, ichor, mats, rng):
     bv.segments = 2
     parts.append(blade)
 
-    arc = [(0.25, 0.47), (0.18, 0.545), (0.11, 0.60), (0.01, 0.628),
-           (-0.09, 0.635), (-0.19, 0.622), (-0.27, 0.60), (-0.35, 0.535),
-           (-0.42, 0.47)]
+    arc = [(0.295, 0.565), (0.215, 0.615), (0.135, 0.650), (0.020, 0.670),
+           (-0.095, 0.675), (-0.215, 0.652), (-0.325, 0.620), (-0.430, 0.560),
+           (-0.520, 0.495), (-0.610, 0.400), (-0.690, 0.300)]
     for i in range(len(arc) - 1):
         p0 = T + d * arc[i][0] + o * arc[i][1]
         p1 = T + d * arc[i + 1][0] + o * arc[i + 1][1]
-        e = _strip(f"{TAG}axe_welt{i}", p0, p1, o, 0.036, 0.022)
+        e = _strip(f"{TAG}axe_welt{i}", p0, p1, o, 0.052, 0.020)
         _mat(e, mats["axe_edge"])
         parts.append(e)
 
     bspike = _tube(TAG + "axe_backspike",
                    [T - o * 0.02, T - o * 0.22 + d * 0.05, T - o * 0.38 + d * 0.11],
-                   [(0.126, 0.045), (0.085, 0.031), (0.009, 0.007)], sides=6)
+                   [(0.100, 0.030), (0.068, 0.021), (0.008, 0.006)], sides=6)
     _mat(bspike, mats["axe"])
     parts.append(bspike)
     for i, sp in enumerate((-0.30, 0.24)):
         col = _tube(f"{TAG}axe_collar{i}", [T + d * sp - o * 0.045, T + d * sp + o * 0.11],
-                    [0.066, 0.056], sides=8)
+                    [0.052, 0.044], sides=8)
         _mat(col, mats["bone_dim"])
         col.modifiers.new("Bevel", "BEVEL").width = 0.005
         parts.append(col)
