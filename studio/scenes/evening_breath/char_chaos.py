@@ -154,6 +154,15 @@ def _materials():
     # dark fluid catching a teal highlight, not as glowing paint.
     M["ichor"], _ = nm(TAG + "ichor", base_color=ICHOR, roughness=0.035, metallic=0.20,
                        emission_color=(0.090, 0.190, 0.035, 1.0), emission_strength=0.06)
+    # Blood-red for what runs off the AXE specifically. The scene brief made
+    # all demon ichor black-teal, which on the axe's dark blade read as dark
+    # blue rather than as blood. Red separates the kill from the Chaos Lord's
+    # own fel-green glow, and sits in the same family as DIRE's own dark-red
+    # horn colour (0x401010) rather than introducing a foreign hue.
+    M["ichor_red"], _ = nm(TAG + "ichor_red", base_color=(0.380, 0.040, 0.030, 1.0),
+                           roughness=0.030, metallic=0.18,
+                           emission_color=(0.330, 0.035, 0.022, 1.0),
+                           emission_strength=0.10)
     return M
 
 
@@ -1281,7 +1290,7 @@ def _build_axe(parts, glow, ichor, mats, rng):
             pts.append(T + d * (s0 - 0.045 * k) + o * (t0 + 0.130 * k)
                        + n * (th0 * (0.80 - 0.18 * k)))
         run = _tube(f"{TAG}axe_runnel{i}", pts, [0.013, 0.020, 0.016, 0.009], sides=6)
-        _mat(run, mats["ichor"])
+        _mat(run, mats["ichor_red"])
         _smooth(run, 2)
         ichor.append(run)
 
@@ -1294,7 +1303,7 @@ def _build_axe(parts, glow, ichor, mats, rng):
                     base + Vector((0.007, -ln * 0.70, 0.009)),
                     base + Vector((0.007, -ln, 0.007))],
                    [0.021, 0.034, 0.023, 0.004], sides=6)
-        _mat(dr, mats["ichor"])
+        _mat(dr, mats["ichor_red"])
         _smooth(dr, 2)
         ichor.append(dr)
         for k, fall in enumerate((0.34, 0.74)):
@@ -1303,14 +1312,14 @@ def _build_axe(parts, glow, ichor, mats, rng):
             dp = _blob(f"{TAG}axe_droplet{i}_{k}",
                        tuple(base + Vector((0.009, -ln - fall, 0.011))),
                        (0.019, 0.032, 0.019), subdiv=2)
-            _mat(dp, mats["ichor"])
+            _mat(dp, mats["ichor_red"])
             _smooth(dp, 1)
             ichor.append(dp)
     for i in range(0, len(arc) - 1, 2):
         p0 = T + d * arc[i][0] + o * arc[i][1]
         p1 = T + d * arc[i + 1][0] + o * arc[i + 1][1]
         sm = _strip(f"{TAG}axe_edgeichor{i}", p0, p1, n, 0.042, 0.022)
-        _mat(sm, mats["ichor"])
+        _mat(sm, mats["ichor_red"])
         ichor.append(sm)
 
 
