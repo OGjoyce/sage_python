@@ -35,7 +35,9 @@ FZ = (0, -2.0, 3.0, -1.5, 2.5, 4.0, -3.0, 0.5, -1.0, -4.0)
 FPH = (0, 3.5, 7.2, 11.0, 15.3, 1.8, 5.5, 9.0, 13.7, 17.1)
 
 
-def build(tickF=0.0, anim=0, name="DIRE_hero"):
+def build(tickF=0.0, anim=0, name="DIRE_hero", **bake):
+    """**bake is forwarded to GLModel.build() -- unlit/emit_strength/
+    emit_threshold, for dropping the model into a lit scene."""
     tick = int(tickF)
     m = GLModel(name)
 
@@ -221,4 +223,4 @@ def build(tickF=0.0, anim=0, name="DIRE_hero"):
         m.cube3(fx, rY + 0.2, fz, 0.9, DI_HOT,
                 1.10 + 0.30 * math.sin(tickF * 2.0 + i))
 
-    return m.build()
+    return m.build(**bake)

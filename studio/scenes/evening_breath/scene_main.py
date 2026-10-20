@@ -95,7 +95,10 @@ PLACEMENT = {
     # facing the camera rather than facing him, which killed the standoff.
     # +45 deg turns her torso toward him while keeping her face readable.
     "lys":   {"module": "char_lys",    "loc": (-1.40, 0.0,  3.3), "rot_y": 45.0},
-    "chaos": {"module": "char_chaos",  "loc": (2.20, 0.0,   1.5), "rot_y": -30.0},
+    # The Chaos Lord slot now holds CraftWar's own DIRE hero, translated from
+    # src/gfx/models3d/dire_hero.cpp rather than re-imagined. char_chaos.py is
+    # kept on disk; switch this module name back to compare the two.
+    "chaos": {"module": "char_dire",    "loc": (2.20, 0.0,   1.5), "rot_y": -30.0},
     "props": {"module": "props_fiend", "loc": (0.00, 0.0,   0.0), "rot_y": 0.0},
 }
 # props_fiend returns two sub-roots that are placed independently

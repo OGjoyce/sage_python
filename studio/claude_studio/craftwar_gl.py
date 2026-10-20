@@ -139,6 +139,18 @@ class GLModel:
         self.face_norms.append(
             n.normalized() if n.length > 1e-9 else mathutils.Vector((0, 0, 0)))
 
+    def tri(self, p0, p1, p2, rgb, mul):
+        """One flat triangle, for the GL_TRIANGLES runs (feathers, plumes)."""
+        base = len(self.verts)
+        pts = [self._m @ mathutils.Vector(p) for p in (p0, p1, p2)]
+        for p in pts:
+            self.verts.append(tuple(p))
+        self.faces.append((base, base + 1, base + 2))
+        self.face_cols.append(_col(rgb, mul))
+        n = (pts[1] - pts[0]).cross(pts[2] - pts[0])
+        self.face_norms.append(
+            n.normalized() if n.length > 1e-9 else mathutils.Vector((0, 0, 0)))
+
     # ---- gl3d_draw.h primitives ---------------------------------------
     def box3d(self, x0, y0, z0, x1, y1, z1, col, mul=1.0):
         """Axis-aligned box with the 6-face directional shading table."""
@@ -220,10 +232,21 @@ class GLModel:
                       col, mul)
 
     # ---- bake ---------------------------------------------------------
-    def build(self, unlit=True):
-        """Create the Blender object. Unlit by default, because the game does
-        all its shading in the face table above -- adding scene lighting on top
-        would double-shade it and stop matching."""
+    def build(self, unlit=True, emit_strength=4.0, emit_threshold=0.35):
+        """Create the Blender object.
+
+        unlit=True (default) is the faithful mode: the game does all its
+        shading in the face table above, so adding scene lighting on top would
+        double-shade it and stop matching.
+
+        unlit=False is for dropping a model into a lit cinematic scene. The
+        vertex colours still carry the game's face shading, and they drive
+        Base Color; on top of that, the parts the game authored BRIGHT (a
+        fel-green ember, a flame tongue, a solar disc) are the parts that are
+        meant to glow, so luminance above emit_threshold is mapped onto
+        emission strength. Dark flesh stays matte and takes the scene's light;
+        the glow reads as glow.
+        """
         verts = list(self.verts)
         total = max(len(self.faces) - 1, 1)
         for i, face in enumerate(self.faces):
@@ -248,17 +271,30 @@ class GLModel:
         nt = mat.node_tree
         nt.nodes.clear()
         out = nt.nodes.new("ShaderNodeOutputMaterial")
+        cattr = nt.nodes.new("ShaderNodeVertexColor")
+        cattr.layer_name = "GLCol"
+
         if unlit:
             shader = nt.nodes.new("ShaderNodeEmission")
             shader.inputs["Strength"].default_value = 1.0
-            col_in = shader.inputs["Color"]
+            nt.links.new(cattr.outputs["Color"], shader.inputs["Color"])
         else:
             shader = nt.nodes.new("ShaderNodeBsdfPrincipled")
             shader.inputs["Roughness"].default_value = 0.55
-            col_in = shader.inputs["Base Color"]
-        cattr = nt.nodes.new("ShaderNodeVertexColor")
-        cattr.layer_name = "GLCol"
-        nt.links.new(cattr.outputs["Color"], col_in)
+            shader.inputs["Metallic"].default_value = 0.0
+            nt.links.new(cattr.outputs["Color"], shader.inputs["Base Color"])
+            nt.links.new(cattr.outputs["Color"], shader.inputs["Emission Color"])
+            bw = nt.nodes.new("ShaderNodeRGBToBW")
+            nt.links.new(cattr.outputs["Color"], bw.inputs["Color"])
+            rng = nt.nodes.new("ShaderNodeMapRange")
+            rng.clamp = True
+            rng.inputs["From Min"].default_value = emit_threshold
+            rng.inputs["From Max"].default_value = 1.0
+            rng.inputs["To Min"].default_value = 0.0
+            rng.inputs["To Max"].default_value = emit_strength
+            nt.links.new(bw.outputs["Val"], rng.inputs["Value"])
+            nt.links.new(rng.outputs["Result"], shader.inputs["Emission Strength"])
+
         nt.links.new(shader.outputs[0], out.inputs["Surface"])
         mesh.materials.append(mat)
 
