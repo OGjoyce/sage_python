@@ -257,8 +257,14 @@ class GLModel:
         same brightnesses. Same glow, same place, view-independent -- and it
         still looks right from every angle an orbit passes through, which a
         single flat billboard baked into the mesh would not.
+
+        The widest, faintest fan is included even though it is nearly invisible
+        on its own: it is what fills the gap between the bright core and
+        whatever ring the model draws around it. Dropping it left the Mayan
+        hero's pyrite mirror disc as a dark obsidian ring with a hole in it.
         """
-        for fr, cm in ((r * 0.52, mul * 0.32),
+        for fr, cm in ((r, mul * 0.08),
+                       (r * 0.52, mul * 0.32),
                        (r * 0.26, mul * 0.75),
                        (r * 0.10, mul * 1.00)):
             px = ((fr, 0, 0), (-fr, 0, 0))
