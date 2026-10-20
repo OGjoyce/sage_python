@@ -10,6 +10,7 @@ from the model's measured bounding box, so this works unchanged for any of the
 108 models as they get ported.
 """
 
+import inspect
 import math
 import os
 import sys
@@ -34,6 +35,12 @@ RES = int(opt("--res", "700"))
 SAMPLES = int(opt("--samples", "24"))
 ZOOM = float(opt("--zoom", "1.0"))   # <1 tightens the frame onto the figure
 AIMY = float(opt("--aimy", "0.0"))   # lifts the aim point, in bbox heights
+AZ0 = float(opt("--az0", "0"))     # starting azimuth. The hero models face +Z,
+                                   # but the unit models put their eyes outside
+                                   # the -Z face -- they face AWAY from the
+                                   # heroes' front, so a roster of units wants
+                                   # --az0 180 to be looking at their faces.
+IDX = int(opt("--idx", "0"))       # unit/building index, for the *_units and *_bldg modules
 OUTDIR = opt("--out", "/home/user/sage_python/studio/renders/craftwar_models")
 
 # ---- empty scene -----------------------------------------------------------
@@ -52,7 +59,16 @@ scene.render.image_settings.color_mode = "RGBA"
 
 # ---- build the model -------------------------------------------------------
 mod = __import__("craftwar_models." + MODEL, fromlist=["build"])
-obj = mod.build(tickF=TICK, anim=ANIM)
+# The unit and building modules take an index, as drawXUnit3D/drawXBldg3D do
+# in the C++; the hero modules do not. Ask the function rather than keeping a
+# list here that would drift as more are ported.
+kwargs = dict(tickF=TICK, anim=ANIM)
+if "idx" in inspect.signature(mod.build).parameters:
+    kwargs["idx"] = IDX
+obj = mod.build(**kwargs)
+if obj is None:
+    print(f"MODEL {MODEL}: index {IDX} is not implemented (the C++ returns false)")
+    sys.exit(0)
 print(f"MODEL {MODEL}: {len(obj.data.polygons)} faces, {len(obj.data.vertices)} verts")
 
 bpy.context.view_layer.update()
@@ -77,7 +93,7 @@ os.makedirs(OUTDIR, exist_ok=True)
 paths = []
 
 for v in range(VIEWS):
-    az = math.radians(360.0 * v / VIEWS)
+    az = math.radians(AZ0 + 360.0 * v / VIEWS)
     # Y-up: azimuth sweeps XZ, elevation lifts Y. View 0 looks at the front (+Z).
     cam.location = (
         ctr.x + dist * math.cos(elev) * math.sin(az),
@@ -97,7 +113,7 @@ for v in range(VIEWS):
         (right.z, up2.z, fwd.z, cam.location.z),
         (0, 0, 0, 1),
     ))
-    p = os.path.join(OUTDIR, f"{MODEL}_a{ANIM}_v{v}.png")
+    p = os.path.join(OUTDIR, f"{MODEL}{IDX}_a{ANIM}_v{v}.png")
     scene.render.filepath = p
     bpy.ops.render.render(write_still=True)
     paths.append(p)
