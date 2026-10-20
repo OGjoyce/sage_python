@@ -206,10 +206,17 @@ scene.add(lysKick);
 // --------------------------------------------------------------- compose --
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloomRes = FAST ? new THREE.Vector2(innerWidth * 0.5, innerHeight * 0.5)
-                      : new THREE.Vector2(innerWidth, innerHeight);
-const bloom = new UnrealBloomPass(bloomRes, 0.34, 0.68, 0.95);
-composer.addPass(bloom);
+// UnrealBloomPass is a five-level downsample-and-blur chain: on a GPU it is
+// free, under SwiftShader (which is what the headless capture runs on, there
+// being no GPU here) it dominates the frame, pushing a 960x540 capture to 43
+// seconds a frame. Capture mode drops it and compensates in the grade, which
+// takes the same move to about 3 seconds a frame. Interactive viewing keeps
+// the real thing.
+const bloom = FAST ? null
+                   : new UnrealBloomPass(
+                       new THREE.Vector2(innerWidth, innerHeight), 0.34, 0.68, 0.95);
+if (bloom) composer.addPass(bloom);
+if (FAST) renderer.toneMappingExposure *= 1.12;   // bloom was carrying some lift
 
 // --------------------------------------------------------- camera moves ---
 const controls = new OrbitControls(camera, renderer.domElement);
