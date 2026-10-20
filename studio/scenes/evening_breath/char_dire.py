@@ -37,11 +37,15 @@ ANIM = 0             # idle
 
 
 def build():
-    # unlit=False: see the module docstring. Threshold 0.42 keeps the fel-dark
-    # flesh (0x1A1020) and the deep shadow matte, while the fel-green, the
-    # white-hot flame bases and the bone emit light of their own.
+    # unlit=False: see the module docstring. The threshold is what separates
+    # glow from paint. At 0.42 the aura rings (DI_GLOW at 0.65 and 0.28) were
+    # over it too, so 3.5 m of fel-green floor lit up evenly and read as a flat
+    # green disc rather than fire seen through crystal. 0.58 keeps the hot
+    # cores -- socket embers, heart, flame bases, the bright inner ring -- and
+    # drops the dim outer ones back to lit surfaces, which is how a ring of
+    # fire actually falls off.
     obj = dire_hero.build(tickF=TICK, anim=ANIM, name="DIRE_hero",
-                          unlit=False, emit_strength=5.0, emit_threshold=0.42)
+                          unlit=False, emit_strength=1.8, emit_threshold=0.58)
 
     scaler = bpy.data.objects.new("DIRE_scale", None)
     bpy.context.collection.objects.link(scaler)

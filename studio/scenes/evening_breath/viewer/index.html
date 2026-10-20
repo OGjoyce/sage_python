@@ -302,6 +302,24 @@ loader.load('./evening_breath.glb', (gltf) => {
         if (/under/i.test(m.name || '')) {
           m.emissiveIntensity = (m.emissiveIntensity || 1) * 0.22;
         }
+        // The DIRE hero is CraftWar's own model, translated from its C++
+        // draw calls. Two things it needs that the rest of the scene does
+        // not. Its colour lives in a per-face vertex-colour attribute (the
+        // game's face-brightness table, baked), not in a texture, so base
+        // colour must not be multiplied by a white factor that discards it.
+        // And its aura is built from GL_LINES stand-ins -- thin open bars
+        // whose inward faces front-face culling would eat, taking the
+        // fel-fire with them -- so it renders double-sided.
+        if (/^DIRE/i.test(o.name || '') || /^DIRE/i.test(m.name || '')) {
+          m.side = THREE.DoubleSide;
+          m.vertexColors = true;
+          if (m.color) m.color.setRGB(1, 1, 1);
+          if (m.emissive) {
+            m.emissive.setHex(0x80ff30);
+            m.emissiveIntensity = 0.30;
+          }
+          m.needsUpdate = true;
+        }
       }
     }
   });

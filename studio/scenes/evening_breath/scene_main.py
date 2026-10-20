@@ -98,7 +98,11 @@ PLACEMENT = {
     # The Chaos Lord slot now holds CraftWar's own DIRE hero, translated from
     # src/gfx/models3d/dire_hero.cpp rather than re-imagined. char_chaos.py is
     # kept on disk; switch this module name back to compare the two.
-    "chaos": {"module": "char_dire",    "loc": (2.20, 0.0,   1.5), "rot_y": -30.0},
+    # -63 deg aims the model's +Z front straight at Lys: the vector from him
+    # (2.20, 1.5) to her (-1.40, 3.3) is atan2(-3.6, 1.8). At the old -30 he
+    # read as facing the lens, which is the standoff the shot is supposed to
+    # have between them.
+    "chaos": {"module": "char_dire",    "loc": (2.20, 0.0,   1.5), "rot_y": -63.0},
     "props": {"module": "props_fiend", "loc": (0.00, 0.0,   0.0), "rot_y": 0.0},
 }
 # props_fiend returns two sub-roots that are placed independently
@@ -404,10 +408,13 @@ cs.scene.add_area_light(
     (0.0, 3.4, -1.6), target=(0.2, 1.7, 2.3),
     energy=120.0, size=6.0, color=GOLD_LAW, name="GATE_glyph_spill")
 
-# cyan accent from the Chaos Lord's cracks -- motivated practical fill
+# Fel accent off the Chaos Lord -- motivated practical fill. Cut from 70 when
+# char_chaos (which emitted almost nothing on its own) was replaced by the
+# translated DIRE model, whose socket embers, heart core and fire column are
+# real emitters: at 70 the two stacked and painted him flat green.
 cs.scene.add_area_light(
     (3.6, 1.7, 2.6), target=(1.6, 1.8, 2.0),
-    energy=70.0, size=2.2, color=FEL_GREEN, name="CHAOS_crack_fill")
+    energy=26.0, size=2.2, color=FEL_GREEN, name="CHAOS_crack_fill")
 
 # cold fill from camera-right-high so the ivory plate does not go to black
 cs.scene.add_area_light(
@@ -621,7 +628,7 @@ def build_chaos_aura():
     # a low cold source inside the aura so it is lit from within
     cs.scene.add_area_light(
         (cx, 0.55, cz + 0.9), target=(cx, 2.10, cz),
-        energy=55.0, size=1.8, color=FEL_GREEN, name="CHAOS_aura_core")
+        energy=22.0, size=1.8, color=FEL_GREEN, name="CHAOS_aura_core")
     return dom
 
 

@@ -221,15 +221,28 @@ class GLModel:
                           tuple(q1 + o2), tuple(q0 + o2), c, m)
 
     def wisp3(self, cx, cy, cz, r, col, mul=1.0):
-        """wisp3 is a camera-facing additive billboard. A raytraced still has
-        no single 'camera right', so it becomes a small emissive octahedron --
-        same glow, same place, view-independent."""
-        for sx, sy, sz in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)):
-            self.quad((cx + sx * r, cy + sy * r, cz + sz * r),
-                      (cx + sx * r * 0.5 + r * 0.5, cy + sy * r * 0.5, cz + sz * r * 0.5),
-                      (cx + sx * r * 0.5, cy + sy * r * 0.5 + r * 0.5, cz + sz * r * 0.5),
-                      (cx + sx * r * 0.5, cy + sy * r * 0.5, cz + sz * r * 0.5 + r * 0.5),
-                      col, mul)
+        """wisp3 is a camera-facing additive billboard: four concentric fans at
+        r, r*0.52, r*0.26 and r*0.10, each bright at the centre and fading to
+        nothing at its edge, so the stack reads as a soft glowing orb.
+
+        A raytraced frame has no single 'camera right' and nothing orbits with
+        the lens, so the fans become nested octahedra at the same radii and the
+        same brightnesses. Same glow, same place, view-independent -- and it
+        still looks right from every angle an orbit passes through, which a
+        single flat billboard baked into the mesh would not.
+        """
+        for fr, cm in ((r * 0.52, mul * 0.32),
+                       (r * 0.26, mul * 0.75),
+                       (r * 0.10, mul * 1.00)):
+            px = ((fr, 0, 0), (-fr, 0, 0))
+            py = ((0, fr, 0), (0, -fr, 0))
+            pz = ((0, 0, fr), (0, 0, -fr))
+            for a in px:
+                for b in py:
+                    for c in pz:
+                        self.tri((cx + a[0], cy + a[1], cz + a[2]),
+                                 (cx + b[0], cy + b[1], cz + b[2]),
+                                 (cx + c[0], cy + c[1], cz + c[2]), col, cm)
 
     # ---- bake ---------------------------------------------------------
     def build(self, unlit=True, emit_strength=4.0, emit_threshold=0.35):
