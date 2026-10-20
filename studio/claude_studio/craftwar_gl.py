@@ -151,6 +151,33 @@ class GLModel:
         self.face_norms.append(
             n.normalized() if n.length > 1e-9 else mathutils.Vector((0, 0, 0)))
 
+    def fan(self, center, rim, col, mul_center, mul_edge, col_edge=None, rings=4):
+        """A GL_TRIANGLE_FAN with a bright centre fading out to its rim.
+
+        GL shades a fan smoothly from the centre vertex's colour to the rim
+        vertices', which one flat triangle per wedge cannot reproduce. The
+        wedge is split into `rings` concentric bands instead, each carrying the
+        colour at its own radius -- the same falloff, in flat faces.
+        """
+        c = mathutils.Vector(center)
+        pts = [mathutils.Vector(p) for p in rim]
+        if col_edge is None:
+            col_edge = col
+        for k in range(rings):
+            t0, t1 = k / rings, (k + 1) / rings
+            tm = (t0 + t1) * 0.5
+            cm = _lerp_rgb(col, col_edge, tm)
+            mm = mul_center + (mul_edge - mul_center) * tm
+            for i in range(len(pts) - 1):
+                a0 = c.lerp(pts[i], t0)
+                a1 = c.lerp(pts[i + 1], t0)
+                b0 = c.lerp(pts[i], t1)
+                b1 = c.lerp(pts[i + 1], t1)
+                if t0 == 0.0:
+                    self.tri(tuple(a0), tuple(b0), tuple(b1), cm, mm)
+                else:
+                    self.quad(tuple(a0), tuple(a1), tuple(b1), tuple(b0), cm, mm)
+
     # ---- gl3d_draw.h primitives ---------------------------------------
     def box3d(self, x0, y0, z0, x1, y1, z1, col, mul=1.0):
         """Axis-aligned box with the 6-face directional shading table."""
